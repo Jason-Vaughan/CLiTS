@@ -1,0 +1,15 @@
+{
+  "name": "ai-debug-extractor",
+  "version": "0.1.0",
+  "description": "CLI tool for extracting and sharing debugging data for AI and web projects.",
+  "main": "src/cli.ts",
+  "bin": {
+    "ai-debug-extractor": "src/cli.ts"
+  },
+  "scripts": {
+    "start": "node src/cli.ts"
+  },
+  "keywords": ["cli", "debugging", "ai", "logs", "extractor"],
+  "author": "Jason Vaughan",
+  "license": "MIT"
+} 
