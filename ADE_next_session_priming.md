@@ -1,83 +1,85 @@
 # ADE_next_session_priming.md
 
-_Last updated: 2024-03-19_
+_Last updated: 2025-06-03_
 
-## Next Session Tasks
+## Current State
 
-**Primary Focus:** Chrome-Specific Error Handling and Cross-Platform Testing
+1. **Display Manager Issue Investigation**
+   - Empty displays section in OnDeck-V9
+   - Potential SharedImageManager and Invalid mailbox errors
+   - MojoAudioOutputIPC failures reported
 
-### Immediate Tasks (Next Session)
-1. **Handle DEPRECATED_ENDPOINT Errors**
-   - [ ] Create ChromeErrorHandler class for Chrome-specific errors
-   - [ ] Implement retry logic for registration failures
-   - [ ] Add exponential backoff for retries
-   - [ ] Add configuration options for retry attempts and delays
-   - [ ] Update documentation with retry behavior
+2. **CLITS (Chrome Log Inspector Tool System) Development**
+   - Basic functionality working:
+     - Successfully connects to Chrome debug port
+     - Identifies correct target page
+     - Can collect logs
+   - Current Issues:
+     - Timestamp handling during page refreshes
+     - Log processing errors (`toLowerCase` undefined)
+     - Need better refresh handling
 
-2. **Connection Stability**
-   - [ ] Add reconnection logic for dropped connections
-   - [ ] Implement connection health checks
-   - [ ] Add timeout configurations
-   - [ ] Handle browser crashes gracefully
+## Immediate Tasks (Next Session)
 
-3. **Testing Infrastructure**
-   - [ ] Set up cross-platform testing environment
-   - [ ] Create test cases for Chrome-specific errors
-   - [ ] Add integration tests for retry logic
-   - [ ] Document testing procedures
+1. **Fix CLITS Tool Issues**
+   - [ ] Add proper timestamp normalization
+   - [ ] Fix log processing crash
+   - [ ] Implement refresh handling
+   - [ ] Add `--live-mode` with duration parameter
+   - [ ] Improve error reporting format
 
-### Recently Completed
-- [x] Platform-specific error handling
-  - [x] Created platform/error-handler.ts
-  - [x] Implemented macOS task policy error handling
-  - [x] Fixed error handler null/undefined handling
-  - [x] Verified error suppression working
-- [x] Enhanced logging and progress reporting
-- [x] Added real-world testing with Google Labs
-- [x] Updated documentation
+2. **Debug Display Manager**
+   - [ ] Use fixed CLITS to capture display errors
+   - [ ] Focus on SharedImageManager and Invalid mailbox errors
+   - [ ] Analyze connection between GPU and display issues
 
-### Remaining Pre-Deployment Tasks
-1. **Cross-Platform Testing**
-   - [ ] Test on different macOS versions
-   - [ ] Test on Linux (if applicable)
-   - [ ] Test on Windows (if applicable)
+3. **Tool Integration**
+   - [ ] Complete AI assistant integration
+   - [ ] Test error pattern matching
+   - [ ] Document common error scenarios
 
-2. **Performance Testing**
-   - [ ] Large log file handling (>100MB)
-   - [ ] High-frequency logging scenarios
-   - [ ] Memory usage validation
-
-3. **Final Documentation**
-   - [ ] Update README with retry behavior
-   - [ ] Document platform-specific considerations
-   - [ ] Create troubleshooting guide
-   - [ ] Final pre-deployment checklist
-
-## Current Progress
-- [x] Core functionality implementation
-- [x] Basic error handling
-- [x] Platform-specific error handling
-- [ ] Chrome-specific error handling
-- [ ] Cross-platform testing
-- [ ] Final validation
+## Recently Completed
+- [x] Initial CLITS implementation
+- [x] Chrome DevTools Protocol integration
+- [x] Basic log collection working
+- [x] Tool documentation in ade-rule-every-chat.mdc
+- [x] Identified key issues to fix
 
 ## Known Issues to Address
-1. ~~macOS Task Policy Errors~~ (FIXED)
-   ```
-   ERROR:base/process/process_mac.cc:53] task_policy_set TASK_CATEGORY_POLICY: (os/kern) invalid argument
-   ```
 
-2. Chrome Registration Errors (NEXT PRIORITY):
+1. **Timestamp Handling**
    ```
-   ERROR:google_apis/gcm/engine/registration_request.cc:291] Registration response error message: DEPRECATED_ENDPOINT
+   warn: Invalid timestamp encountered
+   ```
+   Next steps:
+   - Add timestamp validation
+   - Implement normalization across page reloads
+   - Add better error context
+
+2. **Log Processing**:
+   ```
+   Failed to extract debug data: Cannot read properties of undefined (reading 'toLowerCase')
    ```
    Proposed solution:
-   - Implement retry logic with exponential backoff
-   - Add configuration for max retries
-   - Handle permanent failures gracefully
-   - Document workarounds if needed
+   - Add null checks
+   - Improve error handling
+   - Add debug logging
 
-3. Performance Validation:
-   - Large log file handling
-   - High-frequency logging
-   - Memory usage optimization 
+3. **Page Refresh Handling**:
+   - Need to handle disconnect/reconnect cycle
+   - Maintain log consistency across refreshes
+   - Add automatic reconnection
+
+## Progress
+- [x] Basic Chrome connection working
+- [x] Log collection implemented
+- [ ] Timestamp handling
+- [ ] Error processing
+- [ ] Live mode implementation
+- [ ] Display issue resolution
+
+## Next Steps
+1. Fix the timestamp and log processing issues in CLITS
+2. Implement better refresh handling
+3. Use the improved tool to debug the display manager issues
+4. Document common error patterns and solutions 
