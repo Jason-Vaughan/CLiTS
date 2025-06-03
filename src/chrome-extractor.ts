@@ -55,6 +55,19 @@ export interface ChromeExtractorOptions {
   maxEntries?: number;
   includeNetwork?: boolean;
   includeConsole?: boolean;
+  filters?: {
+    logLevels?: Array<'error' | 'warning' | 'info' | 'debug'>;
+    sources?: Array<'network' | 'console' | 'devtools'>;
+    domains?: string[];  // Domain patterns to match (e.g. ["*.google.com", "api.*"])
+    keywords?: string[]; // Keywords to match in log content
+    excludePatterns?: string[]; // Regex patterns to exclude
+  };
+  format?: {
+    groupBySource?: boolean;
+    groupByLevel?: boolean;
+    includeTimestamp?: boolean;
+    includeStackTrace?: boolean;
+  };
 }
 
 interface CollectedLogEntry {
@@ -76,7 +89,20 @@ export class ChromeExtractor {
       host: options.host || ChromeExtractor.DEFAULT_HOST,
       maxEntries: options.maxEntries || ChromeExtractor.DEFAULT_MAX_ENTRIES,
       includeNetwork: options.includeNetwork ?? true,
-      includeConsole: options.includeConsole ?? true
+      includeConsole: options.includeConsole ?? true,
+      filters: {
+        logLevels: options.filters?.logLevels || ['error', 'warning', 'info', 'debug'],
+        sources: options.filters?.sources || ['network', 'console', 'devtools'],
+        domains: options.filters?.domains || [],
+        keywords: options.filters?.keywords || [],
+        excludePatterns: options.filters?.excludePatterns || []
+      },
+      format: {
+        groupBySource: options.format?.groupBySource ?? false,
+        groupByLevel: options.format?.groupByLevel ?? false,
+        includeTimestamp: options.format?.includeTimestamp ?? true,
+        includeStackTrace: options.format?.includeStackTrace ?? true
+      }
     };
   }
 
@@ -118,6 +144,110 @@ export class ChromeExtractor {
       logger.error('Failed to get Chrome debugger URL', { error });
       throw new Error(`Failed to connect to Chrome debugger: ${error instanceof Error ? error.message : String(error)}`);
     }
+  }
+
+  private shouldIncludeLog(log: CollectedLogEntry): boolean {
+    const filters = this.options.filters;
+    
+    // Check log level
+    if (log.type === 'console' || log.type === 'log') {
+      const level = (log.details as ConsoleMessage | DevToolsLogEntry).level.toLowerCase();
+      const logLevel = level as 'error' | 'warning' | 'info' | 'debug';
+      if (!filters.logLevels?.includes(logLevel)) {
+        return false;
+      }
+    }
+
+    // Check source
+    const source = log.type as 'network' | 'console' | 'devtools';
+    if (!filters.sources?.includes(source)) {
+      return false;
+    }
+
+    // Check domains for network requests
+    if (log.type === 'network' && filters.domains && filters.domains.length > 0) {
+      const url = (log.details as NetworkRequest).url;
+      if (!filters.domains.some(domain => 
+        new RegExp(domain.replace(/\*/g, '.*')).test(url)
+      )) {
+        return false;
+      }
+    }
+
+    // Check keywords
+    if (filters.keywords && filters.keywords.length > 0) {
+      const text = JSON.stringify(log.details);
+      if (!filters.keywords.some(keyword => text.includes(keyword))) {
+        return false;
+      }
+    }
+
+    // Check exclude patterns
+    if (filters.excludePatterns && filters.excludePatterns.length > 0) {
+      const text = JSON.stringify(log.details);
+      if (filters.excludePatterns.some(pattern => 
+        new RegExp(pattern).test(text)
+      )) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  private formatLogs(logs: CollectedLogEntry[]): ExtractedLog[] {
+    const formattedLogs = logs.filter(log => this.shouldIncludeLog(log));
+
+    if (this.options.format.groupBySource || this.options.format.groupByLevel) {
+      const groups: { [key: string]: CollectedLogEntry[] } = {};
+      
+      formattedLogs.forEach(log => {
+        let groupKey = '';
+        if (this.options.format.groupBySource) {
+          groupKey += `[${log.type}]`;
+        }
+        if (this.options.format.groupByLevel && (log.type === 'console' || log.type === 'log')) {
+          const level = (log.details as ConsoleMessage | DevToolsLogEntry).level;
+          groupKey += `[${level}]`;
+        }
+        groups[groupKey] = groups[groupKey] || [];
+        groups[groupKey].push(log);
+      });
+
+      return Object.entries(groups).map(([groupKey, groupLogs]) => {
+        const content = groupLogs.map(log => {
+          let entry = '';
+          if (this.options.format.includeTimestamp) {
+            entry += `[${log.timestamp}] `;
+          }
+          if (log.type === 'network') {
+            const req = log.details as NetworkRequest;
+            entry += `${req.method} ${req.url}`;
+          } else {
+            const msg = log.details as ConsoleMessage | DevToolsLogEntry;
+            entry += msg.text;
+            if (this.options.format.includeStackTrace && 'stack' in msg && msg.stack) {
+              entry += `\n${msg.stack}`;
+            }
+          }
+          return entry;
+        }).join('\n');
+
+        return {
+          filePath: `chrome-devtools://${groupKey}`,
+          content,
+          size: content.length,
+          lastModified: new Date(groupLogs[0].timestamp)
+        };
+      });
+    }
+
+    return formattedLogs.map(log => ({
+      filePath: `chrome-devtools://${log.type}/${log.timestamp}`,
+      content: JSON.stringify(log.details, null, 2),
+      size: JSON.stringify(log.details).length,
+      lastModified: new Date(log.timestamp)
+    }));
   }
 
   async extract(): Promise<ExtractedLog[]> {
@@ -206,16 +336,7 @@ export class ChromeExtractor {
       }
       await client.close();
 
-      // Convert to ExtractedLog format
-      const extractedLogs: ExtractedLog[] = logs.slice(0, this.options.maxEntries).map(log => ({
-        filePath: `chrome-devtools://${log.type}/${log.timestamp}`,
-        content: JSON.stringify(log.details, null, 2),
-        size: JSON.stringify(log.details).length,
-        lastModified: new Date(log.timestamp)
-      }));
-
-      logger.info(`Successfully extracted ${extractedLogs.length} Chrome DevTools logs`);
-      return extractedLogs;
+      return this.formatLogs(logs);
     } catch (error) {
       logger.error('Failed to extract Chrome DevTools logs', { error });
       throw error;

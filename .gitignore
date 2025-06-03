@@ -8,4 +8,10 @@ yarn-debug.log*
 yarn-error.log*
 .idea/
 .vscode/
-coverage/ 
+coverage/
+
+# Test directories
+test-logs/
+tmp/
+**/test-data/
+chrome-debug-*/ 

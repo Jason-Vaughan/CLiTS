@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 // BSD: Entry point for the AI-Debug-Extractor CLI tool. Handles command-line arguments and orchestrates log/data extraction.
 
 import { Command } from 'commander';
@@ -32,6 +34,15 @@ async function main(): Promise<void> {
     .option('--chrome-port <port>', 'Chrome DevTools port', '9222')
     .option('--no-network', 'Exclude network logs from Chrome DevTools')
     .option('--no-console', 'Exclude console logs from Chrome DevTools')
+    .option('--log-levels <levels>', 'Filter by log levels (comma-separated)', 'error,warning,info,debug')
+    .option('--sources <sources>', 'Filter by sources (comma-separated)', 'network,console,devtools')
+    .option('--domains <domains>', 'Filter by domain patterns (comma-separated)')
+    .option('--keywords <keywords>', 'Filter by keywords (comma-separated)')
+    .option('--exclude <patterns>', 'Exclude logs matching patterns (comma-separated)')
+    .option('--group-by-source', 'Group logs by their source')
+    .option('--group-by-level', 'Group logs by their level')
+    .option('--no-timestamps', 'Exclude timestamps from output')
+    .option('--no-stack-traces', 'Exclude stack traces from output')
     .action(async (options) => {
       try {
         const extractors = [];
@@ -53,7 +64,20 @@ async function main(): Promise<void> {
             host: options.chromeHost,
             port: parseInt(options.chromePort),
             includeNetwork: options.network,
-            includeConsole: options.console
+            includeConsole: options.console,
+            filters: {
+              logLevels: options.logLevels?.split(',') as Array<'error' | 'warning' | 'info' | 'debug'>,
+              sources: options.sources?.split(',') as Array<'network' | 'console' | 'devtools'>,
+              domains: options.domains?.split(',') || [],
+              keywords: options.keywords?.split(',') || [],
+              excludePatterns: options.exclude?.split(',') || []
+            },
+            format: {
+              groupBySource: options.groupBySource,
+              groupByLevel: options.groupByLevel,
+              includeTimestamp: options.timestamps,
+              includeStackTrace: options.stackTraces
+            }
           });
           extractors.push(chromeExtractor);
         }

@@ -1,12 +1,28 @@
 {
   "name": "ai-debug-extractor",
   "version": "0.1.0",
-  "description": "CLI tool for extracting and sharing debugging data for AI and web projects.",
+  "description": "CLI tool and library for extracting and sharing debugging data for AI and web projects.",
   "type": "module",
-  "main": "dist/cli.js",
-  "bin": {
-    "ai-debug-extractor": "dist/cli.js"
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./cli": {
+      "import": "./dist/cli.js"
+    }
   },
+  "bin": {
+    "ai-debug-extractor": "dist/cli.js",
+    "ade": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "start": "node dist/cli.js",
@@ -23,10 +39,24 @@
     "debugging",
     "ai",
     "logs",
-    "extractor"
+    "extractor",
+    "chrome",
+    "devtools",
+    "debug",
+    "logging"
   ],
   "author": "Jason Vaughan",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jasonvaughan/ai-debug-extractor"
+  },
+  "bugs": {
+    "url": "https://github.com/jasonvaughan/ai-debug-extractor/issues"
+  },
+  "engines": {
+    "node": ">=16"
+  },
   "devDependencies": {
     "@types/jest": "^29.5.14",
     "@types/node": "^20.11.0",
