@@ -3,3 +3,76 @@ description:
 globs:
 alwaysApply: false
 ---
+{
+  "description": "Project rules and documentation standards for AI-Debug-Extractor (ADE). Enforces BSD compliance, project isolation, CLI-first development, and publishing requirements.",
+  "globs": ["**/*"],
+  "project_name": "AI-Debug-Extractor (ADE)",
+  "project_description": "A tool for extracting and sharing debugging data (logs, network info, etc.) for AI and web projects. CLI-first, with future browser extension support.",
+  "rules": {
+    "bsd_compliance": {
+      "description": "Every file must start with a brief summary description (BSD) of its purpose and contents.",
+      "required": true
+    },
+    "project_isolation": {
+      "description": "All code, dependencies, scripts, and documentation must reside within the AI-Debug-Extractor/ folder. No shared dependencies or scripts with other projects.",
+      "required": true
+    },
+    "cli_first_development": {
+      "description": "Initial deliverable is a Node.js CLI tool for log/data extraction. Browser extension is a future milestone.",
+      "required": true
+    },
+    "git_management": {
+      "description": "ADE must have its own git repository, initialized in the project root. No shared git history with other projects.",
+      "required": true
+    },
+    "documentation": {
+      "description": "README.md must include project goals, usage, BSD compliance, and AI assistant integration instructions. All dependencies and install steps must be documented. Add a LICENSE file (MIT or BSD recommended).",
+      "required": true
+    },
+    "publishing": {
+      "description": "Prepare for open-source release (clean code, clear docs, BSD compliance). CLI tool should be installable via npm (future milestone). Browser extension should be publishable to the Chrome Web Store (future milestone).",
+      "required": true
+    },
+    "session_priming": {
+      "description": "Use ade_next_session_priming.md for session planning and progress tracking. Every session must update this file with completed work, current state, and clear next steps for the following session. This is mandatory for seamless handoff and must be followed without user correction.",
+      "required": true
+    },
+    "multi_project_awareness": {
+      "description": "ADE must not interfere with OnDeck-V9 or other projects. Rules and scripts are project-specific.",
+      "required": true
+    },
+    "session_wrap_up_procedure": {
+      "description": "Standardized session wrap-up procedure for ADE. Ensures all work is documented, committed, and ready for the next session. This process is mandatory and must be followed at the end of every session without user correction.",
+      "steps": [
+        {
+          "id": "progress_log",
+          "description": "Update the progress log (if present) or ade_next_session_priming.md with completed work, technical notes, and next steps."
+        },
+        {
+          "id": "next_session",
+          "description": "Update ade_next_session_priming.md with next session's main task, current progress, and starting point."
+        },
+        {
+          "id": "documentation_review",
+          "description": "Review and update README.md and ade-rule-every-chat.mdc as needed (add/remove dependencies, update usage, etc.)."
+        },
+        {
+          "id": "status",
+          "description": "Update the Current Progress section in ade_next_session_priming.md after each completed task."
+        },
+        {
+          "id": "commit",
+          "description": "Ask user if they want to make a git commit (Y/N). If yes, propose a commit message, allow edits, and execute the commit."
+        }
+      ],
+      "validation": {
+        "must_include": [
+          "All completed work documented",
+          "Session priming file updated",
+          "Documentation reviewed",
+          "Git commit confirmation"
+        ]
+      }
+    }
+  }
+}

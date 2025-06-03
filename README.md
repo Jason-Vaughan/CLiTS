@@ -1,33 +1,84 @@
-# AI-Debug-Extractor
+# AI-Debug-Extractor (ADE)
 
-> BSD: CLI tool for extracting and sharing debugging data (logs, network info, etc.) for AI and web projects. CLI-first, with future browser extension support.
-
-## Project Goals
-- Streamline the process of extracting and sharing debugging data for AI and web projects
-- Enable easy collaboration with AI assistants and human developers
-- Provide a CLI tool first, with a browser extension as a future milestone
+A command-line tool for extracting, formatting, and sharing debugging data from AI and web projects. Designed to streamline the process of collecting and analyzing debug information for AI-assisted development.
 
 ## Installation
 
 ```bash
-# Clone the repo (after initializing with git)
+# Clone the repository
 git clone <your-repo-url>
-cd AI-Debug-Extractor
+cd ai-debug-extractor
+
+# Install dependencies
 npm install
+
+# Build the project
+npm run build
+
+# Link for global usage (optional)
+npm link
 ```
 
 ## Usage
 
 ```bash
-node src/cli.ts [options]
+# Extract debug data
+ai-debug-extractor extract
+
+# More commands coming soon...
 ```
 
-## BSD Compliance
-- Every file must start with a brief summary description (BSD) of its purpose and contents.
+## Development
 
-## AI Assistant Integration
-- This tool is designed to make it easy to share relevant debugging data with AI assistants.
-- See the project rules in `ade-rule-every-chat.mdc` for more details.
+```bash
+# Run in development mode
+npm run dev
+
+# Run linter
+npm run lint
+
+# Fix linter issues
+npm run lint:fix
+```
+
+## Planned Features and Milestones
+
+### Phase 1: CLI Foundation (Current)
+- [x] Project setup and configuration
+- [x] Basic CLI structure
+- [x] TypeScript and ESLint integration
+- [ ] Basic log extraction functionality
+- [ ] JSON output formatting
+- [ ] File system operations
+
+### Phase 2: Core Features
+- [ ] Network request/response capture
+- [ ] Console log aggregation
+- [ ] Error stack trace collection
+- [ ] System information gathering
+- [ ] Custom data source plugins
+- [ ] Data filtering and sanitization
+
+### Phase 3: Advanced Features
+- [ ] Browser extension integration
+- [ ] Real-time monitoring
+- [ ] Data compression and encryption
+- [ ] Remote data storage support
+- [ ] Collaborative sharing features
+- [ ] Analysis and visualization tools
+
+### Phase 4: Integration and Ecosystem
+- [ ] CI/CD pipeline integration
+- [ ] IDE plugins
+- [ ] API for programmatic access
+- [ ] Documentation site
+- [ ] Community plugins support
+- [ ] Performance optimization
+
+## Contributing
+
+Contributions are welcome! Please read our contributing guidelines before submitting pull requests.
 
 ## License
-MIT or BSD (to be added) 
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details. 
