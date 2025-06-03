@@ -1,6 +1,6 @@
 {
   "name": "ai-debug-extractor",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "CLI tool and library for extracting and sharing debugging data for AI and web projects.",
   "type": "module",
   "main": "dist/index.js",
@@ -16,7 +16,8 @@
   },
   "bin": {
     "ai-debug-extractor": "dist/cli.js",
-    "ade": "dist/cli.js"
+    "ade": "dist/cli.js",
+    "clits": "dist/cli.js"
   },
   "files": [
     "dist",

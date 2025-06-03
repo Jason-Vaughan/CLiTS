@@ -1,6 +1,6 @@
 # ADE_next_session_priming.md
 
-_Last updated: 2025-06-03_
+_Last updated: 2025-06-04_
 
 ## Current State
 
@@ -10,28 +10,30 @@ _Last updated: 2025-06-03_
    - MojoAudioOutputIPC failures reported
 
 2. **CLITS (Chrome Log Inspector Tool System) Development**
-   - Basic functionality working:
-     - Successfully connects to Chrome debug port
-     - Identifies correct target page
-     - Can collect logs
-   - Current Issues:
-     - Timestamp handling during page refreshes
-     - Log processing errors (`toLowerCase` undefined)
-     - Need better refresh handling
+   - Major improvements implemented in version 0.3.0:
+     - Fixed timestamp handling issues
+     - Fixed log processing errors (`toLowerCase` undefined)
+     - Added built-in log file export
+     - Added advanced boolean filtering
+     - Added error summary statistics
+     - Added live mode with duration
+     - Improved reconnection handling
+   - All requested improvements have been implemented
 
 ## Immediate Tasks (Next Session)
 
-1. **Fix CLITS Tool Issues**
-   - [ ] Add proper timestamp normalization
-   - [ ] Fix log processing crash
-   - [ ] Implement refresh handling
-   - [ ] Add `--live-mode` with duration parameter
-   - [ ] Improve error reporting format
+1. **Upgrade CLITS in OnDeck-V9 Project**
+   - [ ] Uninstall previous version: `npm uninstall ai-debug-extractor`
+   - [ ] Install new version: `npm install ai-debug-extractor@0.3.0`
+   - [ ] Test with Display Manager debugging
+   - [ ] Use new features like advanced filtering and live mode
+   - [ ] Example: `clits extract --chrome --advanced-filter "(SharedImageManager AND error) OR Invalid\ mailbox" --live-mode 300 --error-summary --output-file=display-logs.json`
 
 2. **Debug Display Manager**
-   - [ ] Use fixed CLITS to capture display errors
+   - [ ] Use improved CLITS to capture display errors
    - [ ] Focus on SharedImageManager and Invalid mailbox errors
    - [ ] Analyze connection between GPU and display issues
+   - [ ] Try new error summary to identify patterns
 
 3. **Tool Integration**
    - [ ] Complete AI assistant integration
@@ -39,6 +41,14 @@ _Last updated: 2025-06-03_
    - [ ] Document common error scenarios
 
 ## Recently Completed
+- [x] CLITS tool improvements:
+  - [x] Fixed timestamp handling issues
+  - [x] Fixed log processing errors
+  - [x] Added built-in log file export
+  - [x] Added advanced boolean filtering
+  - [x] Added error summary statistics
+  - [x] Added live mode with duration parameter
+  - [x] Improved reconnection handling
 - [x] Initial CLITS implementation
 - [x] Chrome DevTools Protocol integration
 - [x] Basic log collection working
@@ -47,39 +57,26 @@ _Last updated: 2025-06-03_
 
 ## Known Issues to Address
 
-1. **Timestamp Handling**
+1. **Display Manager Issues**
    ```
-   warn: Invalid timestamp encountered
+   SharedImageManager::ProduceGpuMemoryBuffer failed
+   Invalid mailbox
    ```
    Next steps:
-   - Add timestamp validation
-   - Implement normalization across page reloads
-   - Add better error context
-
-2. **Log Processing**:
-   ```
-   Failed to extract debug data: Cannot read properties of undefined (reading 'toLowerCase')
-   ```
-   Proposed solution:
-   - Add null checks
-   - Improve error handling
-   - Add debug logging
-
-3. **Page Refresh Handling**:
-   - Need to handle disconnect/reconnect cycle
-   - Maintain log consistency across refreshes
-   - Add automatic reconnection
+   - Use improved CLITS for better error capture
+   - Try the new advanced filtering to isolate specific patterns
+   - Use live mode to capture issues as they happen
 
 ## Progress
 - [x] Basic Chrome connection working
 - [x] Log collection implemented
-- [ ] Timestamp handling
-- [ ] Error processing
-- [ ] Live mode implementation
+- [x] Timestamp handling
+- [x] Error processing
+- [x] Live mode implementation
 - [ ] Display issue resolution
 
 ## Next Steps
-1. Fix the timestamp and log processing issues in CLITS
-2. Implement better refresh handling
-3. Use the improved tool to debug the display manager issues
-4. Document common error patterns and solutions 
+1. Upgrade CLITS in the OnDeck-V9 project
+2. Use the improved tool to debug the display manager issues
+3. Document common error patterns and solutions
+4. Complete debugging of display issues 

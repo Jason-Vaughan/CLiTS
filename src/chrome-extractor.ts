@@ -4,6 +4,7 @@ import { createLogger, format, transports } from 'winston';
 import fetch from 'node-fetch';
 import { PlatformErrorHandler } from './platform/error-handler.js';
 import { ChromeErrorHandler, RetryConfig } from './platform/chrome-error-handler.js';
+import { EventEmitter } from 'events';
 
 // Type declarations for Chrome DevTools Protocol
 type NetworkRequest = {
@@ -35,6 +36,14 @@ type DevToolsLogEntry = {
   timestamp: number;
 };
 
+// Add type declaration for CDP client with event handling
+interface CDPClient extends EventEmitter {
+  Network: any;
+  Console: any;
+  Log: any;
+  close: () => Promise<void>;
+}
+
 const logger = createLogger({
   level: 'info',
   format: format.combine(
@@ -58,12 +67,18 @@ export interface ChromeExtractorOptions {
   includeNetwork?: boolean;
   includeConsole?: boolean;
   retryConfig?: Partial<RetryConfig>;
+  reconnect?: {
+    enabled?: boolean;
+    maxAttempts?: number;
+    delayBetweenAttemptsMs?: number;
+  };
   filters?: {
     logLevels?: Array<'error' | 'warning' | 'info' | 'debug'>;
     sources?: Array<'network' | 'console' | 'devtools'>;
     domains?: string[];  // Domain patterns to match (e.g. ["*.google.com", "api.*"])
     keywords?: string[]; // Keywords to match in log content
     excludePatterns?: string[]; // Regex patterns to exclude
+    advancedFilter?: string; // Advanced boolean expression for filtering
   };
   format?: {
     groupBySource?: boolean;
@@ -95,12 +110,18 @@ export class ChromeExtractor {
       includeNetwork: options.includeNetwork ?? true,
       includeConsole: options.includeConsole ?? true,
       retryConfig: options.retryConfig || {},
+      reconnect: {
+        enabled: options.reconnect?.enabled ?? true,
+        maxAttempts: options.reconnect?.maxAttempts ?? 5,
+        delayBetweenAttemptsMs: options.reconnect?.delayBetweenAttemptsMs ?? 2000
+      },
       filters: {
         logLevels: options.filters?.logLevels || ['error', 'warning', 'info', 'debug'],
         sources: options.filters?.sources || ['network', 'console', 'devtools'],
         domains: options.filters?.domains || [],
         keywords: options.filters?.keywords || [],
-        excludePatterns: options.filters?.excludePatterns || []
+        excludePatterns: options.filters?.excludePatterns || [],
+        advancedFilter: options.filters?.advancedFilter || ''
       },
       format: {
         groupBySource: options.format?.groupBySource ?? false,
@@ -158,9 +179,20 @@ export class ChromeExtractor {
   private shouldIncludeLog(log: CollectedLogEntry): boolean {
     const filters = this.options.filters;
     
+    // Apply advanced filter if provided
+    if (filters.advancedFilter && filters.advancedFilter.trim() !== '') {
+      return this.evaluateAdvancedFilter(filters.advancedFilter, log);
+    }
+    
+    // Otherwise apply standard filters
     // Check log level
     if (log.type === 'console' || log.type === 'log') {
-      const level = (log.details as ConsoleMessage | DevToolsLogEntry).level.toLowerCase();
+      const details = log.details as ConsoleMessage | DevToolsLogEntry;
+      if (!details || typeof details.level !== 'string') {
+        logger.warn('Invalid log entry: missing or invalid level property', { log });
+        return false;
+      }
+      const level = details.level.toLowerCase();
       const logLevel = level as 'error' | 'warning' | 'info' | 'debug';
       if (!filters.logLevels?.includes(logLevel)) {
         return false;
@@ -175,7 +207,12 @@ export class ChromeExtractor {
 
     // Check domains for network requests
     if (log.type === 'network' && filters.domains && filters.domains.length > 0) {
-      const url = (log.details as NetworkRequest).url;
+      const details = log.details as NetworkRequest;
+      if (!details || typeof details.url !== 'string') {
+        logger.warn('Invalid network request: missing or invalid url property', { log });
+        return false;
+      }
+      const url = details.url;
       if (!filters.domains.some(domain => 
         new RegExp(domain.replace(/\*/g, '.*')).test(url)
       )) {
@@ -185,23 +222,168 @@ export class ChromeExtractor {
 
     // Check keywords
     if (filters.keywords && filters.keywords.length > 0) {
-      const text = JSON.stringify(log.details);
-      if (!filters.keywords.some(keyword => text.includes(keyword))) {
+      try {
+        const text = JSON.stringify(log.details);
+        if (!filters.keywords.some(keyword => text.includes(keyword))) {
+          return false;
+        }
+      } catch (error) {
+        logger.warn('Failed to stringify log details for keyword filtering', { error, log });
         return false;
       }
     }
 
     // Check exclude patterns
     if (filters.excludePatterns && filters.excludePatterns.length > 0) {
-      const text = JSON.stringify(log.details);
-      if (filters.excludePatterns.some(pattern => 
-        new RegExp(pattern).test(text)
-      )) {
+      try {
+        const text = JSON.stringify(log.details);
+        if (filters.excludePatterns.some(pattern => 
+          new RegExp(pattern).test(text)
+        )) {
+          return false;
+        }
+      } catch (error) {
+        logger.warn('Failed to stringify log details for exclude pattern filtering', { error, log });
         return false;
       }
     }
 
     return true;
+  }
+
+  /**
+   * Evaluates an advanced boolean filter expression against a log entry
+   * Supports AND, OR, NOT, and parentheses for grouping
+   * Example: "(React AND error) OR (network AND 404)"
+   */
+  private evaluateAdvancedFilter(expression: string, log: CollectedLogEntry): boolean {
+    try {
+      // Convert log to string for matching
+      const logString = JSON.stringify(log.details);
+      
+      // Parse expression and evaluate
+      return this.parseAdvancedFilterExpression(expression, logString);
+    } catch (error) {
+      logger.warn('Failed to evaluate advanced filter expression', { 
+        expression, error, logType: log.type 
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Parses and evaluates a boolean filter expression
+   * This is a simple recursive descent parser for boolean expressions
+   */
+  private parseAdvancedFilterExpression(expression: string, logText: string): boolean {
+    // Trim whitespace
+    expression = expression.trim();
+    
+    if (!expression) {
+      return true; // Empty expression matches everything
+    }
+    
+    // Handle parenthesized expressions
+    if (expression.startsWith('(')) {
+      // Find matching closing parenthesis
+      let depth = 1;
+      let closePos = 1;
+      
+      while (depth > 0 && closePos < expression.length) {
+        if (expression[closePos] === '(') {
+          depth++;
+        } else if (expression[closePos] === ')') {
+          depth--;
+        }
+        closePos++;
+      }
+      
+      if (depth !== 0) {
+        logger.warn('Mismatched parentheses in filter expression', { expression });
+        return false;
+      }
+      
+      // Extract and evaluate the inner expression
+      const innerExpr = expression.substring(1, closePos - 1);
+      const innerResult = this.parseAdvancedFilterExpression(innerExpr, logText);
+      
+      // If this is the entire expression, return the result
+      if (closePos === expression.length) {
+        return innerResult;
+      }
+      
+      // Otherwise, continue parsing the rest with the result of the inner expression
+      const rest = expression.substring(closePos).trim();
+      
+      if (rest.toUpperCase().startsWith('AND')) {
+        return innerResult && this.parseAdvancedFilterExpression(rest.substring(3), logText);
+      } else if (rest.toUpperCase().startsWith('OR')) {
+        return innerResult || this.parseAdvancedFilterExpression(rest.substring(2), logText);
+      } else {
+        logger.warn('Invalid operator in filter expression', { expression, rest });
+        return false;
+      }
+    }
+    
+    // Handle NOT expressions
+    if (expression.toUpperCase().startsWith('NOT')) {
+      return !this.parseAdvancedFilterExpression(expression.substring(3).trim(), logText);
+    }
+    
+    // Split by AND/OR operators (outside of parentheses)
+    const andPos = this.findOperatorPosition(expression, 'AND');
+    const orPos = this.findOperatorPosition(expression, 'OR');
+    
+    // Handle AND expressions (higher precedence than OR)
+    if (andPos !== -1 && (orPos === -1 || andPos < orPos)) {
+      const left = expression.substring(0, andPos).trim();
+      const right = expression.substring(andPos + 3).trim();
+      return this.parseAdvancedFilterExpression(left, logText) && 
+             this.parseAdvancedFilterExpression(right, logText);
+    }
+    
+    // Handle OR expressions
+    if (orPos !== -1) {
+      const left = expression.substring(0, orPos).trim();
+      const right = expression.substring(orPos + 2).trim();
+      return this.parseAdvancedFilterExpression(left, logText) || 
+             this.parseAdvancedFilterExpression(right, logText);
+    }
+    
+    // Base case: simple keyword match
+    return logText.includes(expression);
+  }
+  
+  /**
+   * Helper to find the position of a boolean operator outside of parentheses
+   */
+  private findOperatorPosition(expression: string, operator: string): number {
+    let pos = 0;
+    let parenDepth = 0;
+    
+    while (pos < expression.length) {
+      if (expression[pos] === '(') {
+        parenDepth++;
+      } else if (expression[pos] === ')') {
+        parenDepth--;
+      } else if (parenDepth === 0) {
+        // Check if we have the operator at this position
+        if (expression.substring(pos, pos + operator.length).toUpperCase() === operator) {
+          // Verify it's a whole word by checking boundaries
+          const prevChar = pos > 0 ? expression[pos - 1] : ' ';
+          const nextChar = pos + operator.length < expression.length ? 
+                          expression[pos + operator.length] : ' ';
+                          
+          if (/\s/.test(prevChar) && /\s/.test(nextChar)) {
+            return pos;
+          }
+        }
+      }
+      
+      pos++;
+    }
+    
+    return -1;  // Operator not found
   }
 
   private formatLogs(logs: CollectedLogEntry[]): ExtractedLog[] {
@@ -267,7 +449,7 @@ export class ChromeExtractor {
       logger.info('Got debugger URL', { debuggerUrl });
       
       const client = await this.chromeErrorHandler.executeWithRetry(
-        async () => CDP({ target: debuggerUrl }),
+        async () => CDP({ target: debuggerUrl }) as unknown as CDPClient,
         'Connecting to Chrome DevTools'
       );
       logger.info('Connected to Chrome');
@@ -277,10 +459,82 @@ export class ChromeExtractor {
 
       // Helper function to convert Chrome timestamp to ISO string
       const toISOString = (timestamp: number) => {
-        // If timestamp is in seconds (less than year 2100), convert to milliseconds
-        const ms = timestamp < 4102444800 ? timestamp * 1000 : timestamp;
-        return new Date(ms).toISOString();
+        try {
+          // Handle null, undefined, or invalid timestamp values
+          if (!timestamp) {
+            logger.warn('Missing timestamp value', { timestamp });
+            return new Date().toISOString(); // Use current time as fallback
+          }
+          
+          // If timestamp is in seconds (less than year 2100), convert to milliseconds
+          const ms = timestamp < 4102444800 ? timestamp * 1000 : timestamp;
+          
+          // Validate timestamp is within reasonable range
+          if (isNaN(ms) || ms < 0 || ms > 9999999999999) {
+            logger.warn('Invalid timestamp value out of range', { timestamp, ms });
+            return new Date().toISOString(); // Use current time as fallback
+          }
+          
+          return new Date(ms).toISOString();
+        } catch (error) {
+          logger.warn('Invalid timestamp encountered', { timestamp, error });
+          return new Date().toISOString(); // Use current time as fallback
+        }
       };
+
+      // Set up disconnect handling for page refreshes
+      let isReconnecting = false;
+      let reconnectAttempts = 0;
+
+      client.on('disconnect', async () => {
+        logger.warn('Chrome DevTools connection lost, possibly due to page refresh');
+        
+        if (!this.options.reconnect?.enabled || isReconnecting) {
+          return;
+        }
+        
+        isReconnecting = true;
+        
+        while (reconnectAttempts < (this.options.reconnect?.maxAttempts || 5)) {
+          try {
+            reconnectAttempts++;
+            logger.info(`Attempting to reconnect (${reconnectAttempts}/${this.options.reconnect?.maxAttempts || 5})...`);
+            
+            // Wait before attempting to reconnect
+            await new Promise(resolve => setTimeout(resolve, this.options.reconnect?.delayBetweenAttemptsMs || 2000));
+            
+            // Get a fresh debugger URL
+            const newDebuggerUrl = await this.getDebuggerUrl();
+            
+            // Reconnect
+            await client.close();
+            
+            // Use CDP directly with a callback
+            const newClient = await CDP({ target: newDebuggerUrl });
+            logger.info('Reconnected to Chrome DevTools');
+            
+            // Re-enable required domains
+            if (this.options.includeNetwork) {
+              await newClient.Network.enable();
+            }
+            if (this.options.includeConsole) {
+              await newClient.Console.enable();
+              await newClient.Log.enable();
+            }
+            
+            isReconnecting = false;
+            reconnectAttempts = 0;
+            break;
+          } catch (error) {
+            logger.error(`Reconnection attempt ${reconnectAttempts} failed`, { error });
+            
+            if (reconnectAttempts >= (this.options.reconnect?.maxAttempts || 5)) {
+              logger.error('Maximum reconnection attempts reached');
+              break;
+            }
+          }
+        }
+      });
 
       if (this.options.includeNetwork) {
         await Network.enable();
@@ -325,9 +579,9 @@ export class ChromeExtractor {
           }
 
           // Check if this is a Chrome-specific error that should be suppressed
-          if (ChromeErrorHandler.isChromeError(params.text)) {
-            const chromeError = ChromeErrorHandler.handleError(params.text);
-            if (chromeError && ChromeErrorHandler.shouldSuppressError(params.text)) {
+          if (ChromeErrorHandler.isChromeError(new Error(params.text))) {
+            const chromeError = ChromeErrorHandler.handleError(new Error(params.text));
+            if (chromeError && ChromeErrorHandler.shouldSuppressError(new Error(params.text))) {
               logger.debug('Suppressing Chrome-specific error', { error: params.text });
               return;
             }
@@ -352,9 +606,9 @@ export class ChromeExtractor {
           }
 
           // Check if this is a Chrome-specific error that should be suppressed
-          if (ChromeErrorHandler.isChromeError(params.text)) {
-            const chromeError = ChromeErrorHandler.handleError(params.text);
-            if (chromeError && ChromeErrorHandler.shouldSuppressError(params.text)) {
+          if (ChromeErrorHandler.isChromeError(new Error(params.text))) {
+            const chromeError = ChromeErrorHandler.handleError(new Error(params.text));
+            if (chromeError && ChromeErrorHandler.shouldSuppressError(new Error(params.text))) {
               logger.debug('Suppressing Chrome-specific error', { error: params.text });
               return;
             }
