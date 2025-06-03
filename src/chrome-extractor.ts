@@ -3,6 +3,7 @@ import { ExtractedLog } from './extractor.js';
 import { createLogger, format, transports } from 'winston';
 import fetch from 'node-fetch';
 import { PlatformErrorHandler } from './platform/error-handler.js';
+import { ChromeErrorHandler, RetryConfig } from './platform/chrome-error-handler.js';
 
 // Type declarations for Chrome DevTools Protocol
 type NetworkRequest = {
@@ -56,6 +57,7 @@ export interface ChromeExtractorOptions {
   maxEntries?: number;
   includeNetwork?: boolean;
   includeConsole?: boolean;
+  retryConfig?: Partial<RetryConfig>;
   filters?: {
     logLevels?: Array<'error' | 'warning' | 'info' | 'debug'>;
     sources?: Array<'network' | 'console' | 'devtools'>;
@@ -83,6 +85,7 @@ export class ChromeExtractor {
   private static readonly DEFAULT_MAX_ENTRIES = 1000;
 
   private options: Required<ChromeExtractorOptions>;
+  private chromeErrorHandler: ChromeErrorHandler;
 
   constructor(options: ChromeExtractorOptions = {}) {
     this.options = {
@@ -91,6 +94,7 @@ export class ChromeExtractor {
       maxEntries: options.maxEntries || ChromeExtractor.DEFAULT_MAX_ENTRIES,
       includeNetwork: options.includeNetwork ?? true,
       includeConsole: options.includeConsole ?? true,
+      retryConfig: options.retryConfig || {},
       filters: {
         logLevels: options.filters?.logLevels || ['error', 'warning', 'info', 'debug'],
         sources: options.filters?.sources || ['network', 'console', 'devtools'],
@@ -105,46 +109,50 @@ export class ChromeExtractor {
         includeStackTrace: options.format?.includeStackTrace ?? true
       }
     };
+
+    this.chromeErrorHandler = new ChromeErrorHandler(this.options.retryConfig);
   }
 
   private async getDebuggerUrl(): Promise<string> {
-    try {
-      // First check if Chrome is running
-      const versionResponse = await fetch(`http://${this.options.host}:${this.options.port}/json/version`);
-      if (!versionResponse.ok) {
-        throw new Error('Chrome is not running with remote debugging enabled. Start Chrome with --remote-debugging-port=9222');
+    return this.chromeErrorHandler.executeWithRetry(async () => {
+      try {
+        // First check if Chrome is running
+        const versionResponse = await fetch(`http://${this.options.host}:${this.options.port}/json/version`);
+        if (!versionResponse.ok) {
+          throw new Error('Chrome is not running with remote debugging enabled. Start Chrome with --remote-debugging-port=9222');
+        }
+
+        // Then get available targets
+        const response = await fetch(`http://${this.options.host}:${this.options.port}/json/list`);
+        const targets = await response.json() as Array<{
+          type: string;
+          url: string;
+          webSocketDebuggerUrl?: string;
+          title: string;
+        }>;
+
+        logger.info('Available targets', { targets: targets.map(t => ({ type: t.type, url: t.url, title: t.title })) });
+
+        // Find a suitable page target, preferring non-newtab pages
+        const pageTarget = targets.find(t => 
+          t.type === 'page' && !t.url.includes('chrome://newtab')
+        ) || targets.find(t => t.type === 'page');
+        
+        if (!pageTarget?.webSocketDebuggerUrl) {
+          logger.warn('No page target found. Please open a new tab in Chrome.');
+          throw new Error('No debuggable Chrome tab found. Please open a new tab in Chrome running with --remote-debugging-port=9222');
+        }
+
+        logger.info('Selected page target', { url: pageTarget.url, title: pageTarget.title });
+        return pageTarget.webSocketDebuggerUrl;
+      } catch (error) {
+        if (error instanceof Error) {
+          throw error;  // Re-throw our custom errors
+        }
+        logger.error('Failed to get Chrome debugger URL', { error });
+        throw new Error(`Failed to connect to Chrome debugger: ${error instanceof Error ? error.message : String(error)}`);
       }
-
-      // Then get available targets
-      const response = await fetch(`http://${this.options.host}:${this.options.port}/json/list`);
-      const targets = await response.json() as Array<{
-        type: string;
-        url: string;
-        webSocketDebuggerUrl?: string;
-        title: string;
-      }>;
-
-      logger.info('Available targets', { targets: targets.map(t => ({ type: t.type, url: t.url, title: t.title })) });
-
-      // Find a suitable page target, preferring non-newtab pages
-      const pageTarget = targets.find(t => 
-        t.type === 'page' && !t.url.includes('chrome://newtab')
-      ) || targets.find(t => t.type === 'page');
-      
-      if (!pageTarget?.webSocketDebuggerUrl) {
-        logger.warn('No page target found. Please open a new tab in Chrome.');
-        throw new Error('No debuggable Chrome tab found. Please open a new tab in Chrome running with --remote-debugging-port=9222');
-      }
-
-      logger.info('Selected page target', { url: pageTarget.url, title: pageTarget.title });
-      return pageTarget.webSocketDebuggerUrl;
-    } catch (error) {
-      if (error instanceof Error) {
-        throw error;  // Re-throw our custom errors
-      }
-      logger.error('Failed to get Chrome debugger URL', { error });
-      throw new Error(`Failed to connect to Chrome debugger: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    }, 'Getting Chrome debugger URL');
   }
 
   private shouldIncludeLog(log: CollectedLogEntry): boolean {
@@ -258,7 +266,10 @@ export class ChromeExtractor {
       const debuggerUrl = await this.getDebuggerUrl();
       logger.info('Got debugger URL', { debuggerUrl });
       
-      const client = await CDP({ target: debuggerUrl });
+      const client = await this.chromeErrorHandler.executeWithRetry(
+        async () => CDP({ target: debuggerUrl }),
+        'Connecting to Chrome DevTools'
+      );
       logger.info('Connected to Chrome');
 
       const { Network, Console, Log } = client;
@@ -313,6 +324,15 @@ export class ChromeExtractor {
             }
           }
 
+          // Check if this is a Chrome-specific error that should be suppressed
+          if (ChromeErrorHandler.isChromeError(params.text)) {
+            const chromeError = ChromeErrorHandler.handleError(params.text);
+            if (chromeError && ChromeErrorHandler.shouldSuppressError(params.text)) {
+              logger.debug('Suppressing Chrome-specific error', { error: params.text });
+              return;
+            }
+          }
+
           logger.debug('Console message detected', { level: params.level, text: params.text, details: params });
           logs.push({
             type: 'console',
@@ -327,6 +347,15 @@ export class ChromeExtractor {
             const platformError = PlatformErrorHandler.handleError(params.text);
             if (platformError && PlatformErrorHandler.shouldSuppressError(params.text)) {
               logger.debug('Suppressing platform-specific error', { error: params.text });
+              return;
+            }
+          }
+
+          // Check if this is a Chrome-specific error that should be suppressed
+          if (ChromeErrorHandler.isChromeError(params.text)) {
+            const chromeError = ChromeErrorHandler.handleError(params.text);
+            if (chromeError && ChromeErrorHandler.shouldSuppressError(params.text)) {
+              logger.debug('Suppressing Chrome-specific error', { error: params.text });
               return;
             }
           }
@@ -382,6 +411,18 @@ export class ChromeExtractor {
           logger.warn('Encountered suppressible platform-specific error', { 
             error: error.message,
             recommendation: platformError.recommendation 
+          });
+          return [];
+        }
+      }
+
+      // Check if this is a Chrome-specific error
+      if (error instanceof Error && ChromeErrorHandler.isChromeError(error)) {
+        const chromeError = ChromeErrorHandler.handleError(error);
+        if (chromeError && ChromeErrorHandler.shouldSuppressError(error)) {
+          logger.warn('Encountered suppressible Chrome-specific error', { 
+            error: error.message,
+            recommendation: chromeError.recommendation 
           });
           return [];
         }
