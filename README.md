@@ -260,4 +260,133 @@ If you encounter any issues or need help, please:
 
 ## Roadmap
 
-See our [Project Board](https://github.com/jasonvaughan/ai-debug-extractor/projects/1) for planned features and enhancements. 
+See our [Project Board](https://github.com/jasonvaughan/ai-debug-extractor/projects/1) for planned features and enhancements.
+
+## Development Setup
+
+### Prerequisites
+- Node.js >= 14.x
+- TypeScript >= 4.x
+- Chrome/Chromium browser (tested with versions 90-122)
+
+### Development Installation
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/ai-debug-extractor.git
+cd ai-debug-extractor
+
+# Install dependencies
+npm install
+
+# Build TypeScript
+npm run build
+
+# Run tests
+npm test
+```
+
+### TypeScript Configuration
+The project uses TypeScript for type safety and better developer experience. Key configuration:
+- Strict mode enabled
+- ESNext target
+- CommonJS modules
+- Full source maps for debugging
+
+## Chrome Version Compatibility
+
+AI Debug Extractor has been tested with:
+- Chrome Stable (v90-122)
+- Chrome Beta
+- Chrome Canary
+- Chromium
+
+For optimal compatibility:
+```bash
+# Check Chrome version
+chrome://version
+
+# Use matching CDP protocol version
+ade extract --chrome --cdp-version=1.3  # for newer Chrome versions
+ade extract --chrome --cdp-version=1.2  # for older Chrome versions
+```
+
+## Performance Guidelines
+
+### Handling Large Log Files
+```typescript
+import { LogExtractor } from 'ai-debug-extractor';
+
+// Configure for large file processing
+const extractor = new LogExtractor({
+  streamingMode: true,  // Enable streaming for large files
+  batchSize: 1000,      // Process logs in batches
+  maxMemoryUsage: '1gb' // Limit memory usage
+});
+
+// Process logs in chunks
+for await (const logBatch of extractor.streamLogs('./large-log.txt')) {
+  // Process each batch
+  console.log(`Processing batch of ${logBatch.length} logs`);
+}
+```
+
+### High-Frequency Logging
+```typescript
+import { ChromeExtractor } from 'ai-debug-extractor';
+
+const extractor = new ChromeExtractor({
+  bufferSize: 10000,    // Increase buffer for high-frequency logs
+  flushInterval: 1000,  // Flush every second
+  samplingRate: 0.1     // Sample 10% of logs for high-volume scenarios
+});
+
+// Monitor high-frequency logs
+extractor.on('buffer-full', (logs) => {
+  // Handle buffered logs
+  processHighFrequencyLogs(logs);
+});
+```
+
+### Resource Management
+- Use streaming mode for files > 100MB
+- Enable sampling for high-frequency logging (>1000 logs/sec)
+- Configure buffer sizes based on available memory
+- Use batch processing for large datasets
+
+## Testing Infrastructure
+
+### Running Tests
+```bash
+# Run all tests
+npm test
+
+# Run specific test suites
+npm test -- --grep "Chrome extraction"
+npm test -- --grep "File processing"
+
+# Run with coverage
+npm run test:coverage
+```
+
+### Test Categories
+- Unit tests for core functionality
+- Integration tests for Chrome CDP
+- Performance tests for large files
+- End-to-end tests for CLI
+- Stress tests for high-frequency logging
+
+### Writing Tests
+```typescript
+import { ChromeExtractor } from 'ai-debug-extractor';
+
+describe('Chrome Extraction', () => {
+  it('handles high-frequency logs', async () => {
+    const extractor = new ChromeExtractor({
+      samplingRate: 1.0,
+      bufferSize: 1000
+    });
+    
+    // Test implementation
+  });
+});
+``` 

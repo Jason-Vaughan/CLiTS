@@ -2,6 +2,7 @@ import CDP from 'chrome-remote-interface';
 import { ExtractedLog } from './extractor.js';
 import { createLogger, format, transports } from 'winston';
 import fetch from 'node-fetch';
+import { PlatformErrorHandler } from './platform/error-handler.js';
 
 // Type declarations for Chrome DevTools Protocol
 type NetworkRequest = {
@@ -283,7 +284,7 @@ export class ChromeExtractor {
       // Set up event listeners
       if (this.options.includeNetwork) {
         Network.requestWillBeSent((params: NetworkRequest) => {
-          logger.info('Network request detected', { url: params.url });
+          logger.debug('Network request detected', { url: params.url, details: params });
           logs.push({
             type: 'network',
             timestamp: toISOString(params.timestamp),
@@ -292,7 +293,7 @@ export class ChromeExtractor {
         });
 
         Network.responseReceived((params: NetworkResponse) => {
-          logger.info('Network response detected', { status: params.status });
+          logger.debug('Network response detected', { status: params.status, details: params });
           logs.push({
             type: 'network',
             timestamp: toISOString(params.timestamp),
@@ -303,7 +304,16 @@ export class ChromeExtractor {
 
       if (this.options.includeConsole) {
         Console.messageAdded((params: ConsoleMessage) => {
-          logger.info('Console message detected', { text: params.text });
+          // Check if this is a platform-specific error that should be suppressed
+          if (PlatformErrorHandler.isPlatformError(params.text)) {
+            const platformError = PlatformErrorHandler.handleError(params.text);
+            if (platformError && PlatformErrorHandler.shouldSuppressError(params.text)) {
+              logger.debug('Suppressing platform-specific error', { error: params.text });
+              return;
+            }
+          }
+
+          logger.debug('Console message detected', { level: params.level, text: params.text, details: params });
           logs.push({
             type: 'console',
             timestamp: toISOString(params.timestamp),
@@ -312,7 +322,16 @@ export class ChromeExtractor {
         });
 
         Log.entryAdded((params: DevToolsLogEntry) => {
-          logger.info('Log entry detected', { text: params.text });
+          // Check if this is a platform-specific error that should be suppressed
+          if (PlatformErrorHandler.isPlatformError(params.text)) {
+            const platformError = PlatformErrorHandler.handleError(params.text);
+            if (platformError && PlatformErrorHandler.shouldSuppressError(params.text)) {
+              logger.debug('Suppressing platform-specific error', { error: params.text });
+              return;
+            }
+          }
+
+          logger.debug('Log entry detected', { level: params.level, text: params.text, details: params });
           logs.push({
             type: 'log',
             timestamp: toISOString(params.timestamp),
@@ -321,10 +340,25 @@ export class ChromeExtractor {
         });
       }
 
-      // Wait longer to collect logs
+      // Wait longer to collect logs and report progress
       logger.info('Waiting for logs...');
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      logger.info(`Collected ${logs.length} logs so far`);
+      const waitTimeMs = 15000; // Increase to 15 seconds
+      const progressInterval = 1000; // Report every second
+      let elapsed = 0;
+
+      await new Promise<void>((resolve) => {
+        const interval = setInterval(() => {
+          elapsed += progressInterval;
+          logger.info(`Collecting logs... ${elapsed/1000}s elapsed, ${logs.length} logs collected`);
+          
+          if (elapsed >= waitTimeMs) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, progressInterval);
+      });
+
+      logger.info(`Collection complete. ${logs.length} logs collected`);
 
       // Clean up
       if (this.options.includeNetwork) {
@@ -336,8 +370,23 @@ export class ChromeExtractor {
       }
       await client.close();
 
-      return this.formatLogs(logs);
+      const formattedLogs = this.formatLogs(logs);
+      logger.info(`Formatted ${formattedLogs.length} logs after filtering`);
+      
+      return formattedLogs;
     } catch (error) {
+      // Check if this is a platform-specific error
+      if (error instanceof Error && PlatformErrorHandler.isPlatformError(error)) {
+        const platformError = PlatformErrorHandler.handleError(error);
+        if (platformError && PlatformErrorHandler.shouldSuppressError(error)) {
+          logger.warn('Encountered suppressible platform-specific error', { 
+            error: error.message,
+            recommendation: platformError.recommendation 
+          });
+          return [];
+        }
+      }
+
       logger.error('Failed to extract Chrome DevTools logs', { error });
       throw error;
     }
