@@ -1,7 +1,13 @@
 // BSD: Entry point for the AI-Debug-Extractor CLI tool. Handles command-line arguments and orchestrates log/data extraction.
 
 import { Command } from 'commander';
-import ora from 'ora';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import { readFileSync } from 'fs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const packageJson = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8'));
 
 const program = new Command();
 
@@ -9,18 +15,18 @@ async function main(): Promise<void> {
   program
     .name('ai-debug-extractor')
     .description('CLI tool for extracting and sharing debugging data for AI and web projects')
-    .version('0.1.0');
+    .version(packageJson.version);
 
   program
     .command('extract')
     .description('Extract debugging data from specified sources')
     .action(async () => {
-      const spinner = ora('Extracting debug data...').start();
+      console.log('Extracting debug data...');
       try {
         // TODO: Implement extraction logic
-        spinner.succeed('Debug data extracted successfully');
+        console.log('Debug data extracted successfully');
       } catch (error) {
-        spinner.fail(`Failed to extract debug data: ${error instanceof Error ? error.message : String(error)}`);
+        console.error(`Failed to extract debug data: ${error instanceof Error ? error.message : String(error)}`);
         process.exit(1);
       }
     });
