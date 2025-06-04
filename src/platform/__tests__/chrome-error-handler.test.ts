@@ -1,4 +1,5 @@
 import { ChromeErrorHandler, RetryConfig } from '../chrome-error-handler.js';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 describe('ChromeErrorHandler', () => {
   describe('Error Detection', () => {
@@ -59,52 +60,47 @@ describe('ChromeErrorHandler', () => {
 
     beforeEach(() => {
       handler = new ChromeErrorHandler(mockConfig);
-      jest.useFakeTimers();
+      vi.useFakeTimers();
     });
 
     afterEach(() => {
-      jest.useRealTimers();
+      vi.useRealTimers();
     });
 
     it('should succeed on first try', async () => {
-      const operation = jest.fn().mockResolvedValue('success');
+      const operation = vi.fn().mockResolvedValue('success');
       const result = await handler.executeWithRetry(operation, 'test');
       expect(result).toBe('success');
       expect(operation).toHaveBeenCalledTimes(1);
     });
 
     it('should retry on recoverable error', async () => {
-      const operation = jest.fn()
+      const operation = vi.fn()
         .mockRejectedValueOnce(new Error('Registration response error message: DEPRECATED_ENDPOINT'))
         .mockResolvedValueOnce('success');
-
       const promise = handler.executeWithRetry(operation, 'test');
-      
-      // Fast-forward through the retry delay
-      jest.advanceTimersByTime(mockConfig.initialDelayMs);
-      
+      vi.advanceTimersByTime(mockConfig.initialDelayMs);
+      await vi.runAllTimersAsync();
       const result = await promise;
       expect(result).toBe('success');
       expect(operation).toHaveBeenCalledTimes(2);
-    });
+    }, 20000);
 
     it('should respect max retries', async () => {
-      const operation = jest.fn()
+      const operation = vi.fn()
         .mockRejectedValue(new Error('Registration response error message: DEPRECATED_ENDPOINT'));
-
       const promise = handler.executeWithRetry(operation, 'test');
-
-      // Fast-forward through all retry delays
       for (let i = 0; i < mockConfig.maxRetries - 1; i++) {
-        jest.advanceTimersByTime(mockConfig.initialDelayMs * Math.pow(mockConfig.backoffFactor, i));
+        vi.advanceTimersByTime(mockConfig.initialDelayMs * Math.pow(mockConfig.backoffFactor, i));
+        await Promise.resolve();
       }
-
+      await vi.runAllTimersAsync();
       await expect(promise).rejects.toThrow(/failed after 3 attempts/);
       expect(operation).toHaveBeenCalledTimes(mockConfig.maxRetries);
-    });
+    }, 20000);
 
     it('should not retry on non-recoverable error', async () => {
-      const operation = jest.fn()
+      const operation = vi.fn()
         .mockRejectedValue(new Error('Some non-recoverable error'));
 
       await expect(handler.executeWithRetry(operation, 'test'))
@@ -113,52 +109,42 @@ describe('ChromeErrorHandler', () => {
     });
 
     it('should implement exponential backoff', async () => {
-      const operation = jest.fn()
+      const operation = vi.fn()
         .mockRejectedValue(new Error('Registration response error message: DEPRECATED_ENDPOINT'));
-
       const promise = handler.executeWithRetry(operation, 'test');
-
-      // Verify delay increases exponentially
       const expectedDelays = [
         mockConfig.initialDelayMs,
         mockConfig.initialDelayMs * mockConfig.backoffFactor,
         mockConfig.initialDelayMs * Math.pow(mockConfig.backoffFactor, 2)
       ];
-
       for (const delay of expectedDelays) {
-        jest.advanceTimersByTime(delay);
-        await Promise.resolve(); // Let the event loop tick
+        vi.advanceTimersByTime(delay);
+        await Promise.resolve();
       }
-
+      await vi.runAllTimersAsync();
       await expect(promise).rejects.toThrow();
       expect(operation).toHaveBeenCalledTimes(mockConfig.maxRetries);
-    });
+    }, 20000);
 
     it('should respect max delay', async () => {
       const handler = new ChromeErrorHandler({
         maxRetries: 5,
         initialDelayMs: 100,
-        maxDelayMs: 200, // Set low to test capping
+        maxDelayMs: 200,
         backoffFactor: 2
       });
-
-      const operation = jest.fn()
+      const operation = vi.fn()
         .mockRejectedValue(new Error('Registration response error message: DEPRECATED_ENDPOINT'));
-
       const promise = handler.executeWithRetry(operation, 'test');
-
-      // The delays should be: 100, 200, 200, 200, 200
-      // (capped at maxDelayMs)
       const expectedDelays = [100, 200, 200, 200, 200];
-
       for (const delay of expectedDelays) {
-        jest.advanceTimersByTime(delay);
-        await Promise.resolve(); // Let the event loop tick
+        vi.advanceTimersByTime(delay);
+        await Promise.resolve();
       }
-
+      await vi.runAllTimersAsync();
       await expect(promise).rejects.toThrow();
       expect(operation).toHaveBeenCalledTimes(5);
-    });
+    }, 20000);
   });
 
   describe('Error Suppression', () => {

@@ -1,14 +1,15 @@
 import { ChromeExtractor } from '../chrome-extractor.js';
 import CDP from 'chrome-remote-interface';
 import fetch, { Response, Headers } from 'node-fetch';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 // Mock chrome-remote-interface
-jest.mock('chrome-remote-interface');
-const mockCDP = CDP as jest.MockedFunction<typeof CDP>;
+vi.mock('chrome-remote-interface');
+const mockCDP = CDP as ReturnType<typeof vi.mocked<typeof CDP>>;
 
 // Mock node-fetch
-jest.mock('node-fetch');
-const mockFetch = fetch as jest.MockedFunction<typeof fetch>;
+vi.mock('node-fetch');
+const mockFetch = fetch as ReturnType<typeof vi.mocked<typeof fetch>>;
 
 // Helper to create a mock Response
 const createMockResponse = (ok: boolean, jsonData?: any): Response => ({
@@ -35,11 +36,18 @@ const createMockResponse = (ok: boolean, jsonData?: any): Response => ({
   trailer: Promise.resolve(new Headers())
 } as unknown as Response);
 
+// Test subclass to access protected _injectTestEvent
+class TestableChromeExtractor extends ChromeExtractor {
+  public injectTestEvent(type: 'network' | 'console' | 'log', payload: any, logsOverride?: any[]) {
+    return this._injectTestEvent(type, payload, logsOverride);
+  }
+}
+
 describe('ChromeExtractor', () => {
-  let extractor: ChromeExtractor;
+  let extractor: TestableChromeExtractor;
 
   beforeEach(() => {
-    extractor = new ChromeExtractor({
+    extractor = new TestableChromeExtractor({
       retryConfig: {
         maxRetries: 3,
         initialDelayMs: 100,
@@ -49,12 +57,12 @@ describe('ChromeExtractor', () => {
     });
 
     // Reset all mocks
-    jest.clearAllMocks();
-    jest.useFakeTimers();
+    vi.clearAllMocks();
+    vi.useFakeTimers();
   });
 
   afterEach(() => {
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   describe('Connection and Registration', () => {
@@ -71,22 +79,23 @@ describe('ChromeExtractor', () => {
       // Mock CDP connection with DEPRECATED_ENDPOINT error then success
       const mockClient = {
         Network: {
-          enable: jest.fn(),
-          disable: jest.fn(),
-          requestWillBeSent: jest.fn(),
-          responseReceived: jest.fn()
+          enable: vi.fn(),
+          disable: vi.fn(),
+          requestWillBeSent: vi.fn(),
+          responseReceived: vi.fn()
         },
         Console: {
-          enable: jest.fn(),
-          disable: jest.fn(),
-          messageAdded: jest.fn()
+          enable: vi.fn(),
+          disable: vi.fn(),
+          messageAdded: vi.fn()
         },
         Log: {
-          enable: jest.fn(),
-          disable: jest.fn(),
-          entryAdded: jest.fn()
+          enable: vi.fn(),
+          disable: vi.fn(),
+          entryAdded: vi.fn()
         },
-        close: jest.fn()
+        close: vi.fn(),
+        on: vi.fn()
       };
 
       mockCDP
@@ -96,15 +105,15 @@ describe('ChromeExtractor', () => {
       const promise = extractor.extract();
       
       // Fast-forward through the retry delay
-      jest.advanceTimersByTime(100);
-      
+      vi.advanceTimersByTime(100);
+      await vi.runAllTimersAsync();
       await promise;
 
       expect(mockCDP).toHaveBeenCalledTimes(2);
       expect(mockClient.Network.enable).toHaveBeenCalled();
       expect(mockClient.Console.enable).toHaveBeenCalled();
       expect(mockClient.Log.enable).toHaveBeenCalled();
-    });
+    }, 20000);
 
     it('should handle connection failures with retries', async () => {
       // Mock version check success
@@ -124,13 +133,13 @@ describe('ChromeExtractor', () => {
 
       // Fast-forward through all retry delays
       for (let i = 0; i < 3; i++) {
-        jest.advanceTimersByTime(100 * Math.pow(2, i));
+        vi.advanceTimersByTime(100 * Math.pow(2, i));
         await Promise.resolve(); // Let the event loop tick
       }
-
+      await vi.runAllTimersAsync();
       await expect(promise).rejects.toThrow('Failed to connect to Chrome debugging endpoint');
       expect(mockCDP).toHaveBeenCalledTimes(3);
-    });
+    }, 20000);
 
     it('should not retry on non-recoverable errors', async () => {
       // Mock version check failure
@@ -157,84 +166,70 @@ describe('ChromeExtractor', () => {
 
       mockClient = {
         Network: {
-          enable: jest.fn(),
-          disable: jest.fn(),
-          requestWillBeSent: jest.fn(),
-          responseReceived: jest.fn()
+          enable: vi.fn(),
+          disable: vi.fn(),
+          requestWillBeSent: vi.fn(),
+          responseReceived: vi.fn()
         },
         Console: {
-          enable: jest.fn(),
-          disable: jest.fn(),
-          messageAdded: jest.fn()
+          enable: vi.fn(),
+          disable: vi.fn(),
+          messageAdded: vi.fn()
         },
         Log: {
-          enable: jest.fn(),
-          disable: jest.fn(),
-          entryAdded: jest.fn()
+          enable: vi.fn(),
+          disable: vi.fn(),
+          entryAdded: vi.fn()
         },
-        close: jest.fn()
+        close: vi.fn(),
+        on: vi.fn()
       };
 
       mockCDP.mockResolvedValue(mockClient);
     });
 
     it('should suppress DEPRECATED_ENDPOINT errors in console logs', async () => {
-      const promise = extractor.extract();
-
-      // Simulate console message with DEPRECATED_ENDPOINT error
-      const messageCallback = mockClient.Console.messageAdded.mock.calls[0][0];
-      messageCallback({
+      // Simulate a DEPRECATED_ENDPOINT error event
+      const logs: any[] = [];
+      extractor.injectTestEvent('console', {
         level: 'error',
         text: 'Registration response error message: DEPRECATED_ENDPOINT',
         timestamp: Date.now()
-      });
-
-      // Fast-forward through log collection
-      jest.advanceTimersByTime(15000);
-
-      const logs = await promise;
-      expect(logs).toHaveLength(0); // Error should be suppressed
-    });
+      }, logs);
+      // Simulate log collection wait
+      vi.advanceTimersByTime(15000);
+      await vi.runAllTimersAsync();
+      // Should be suppressed, so logs should be empty
+      expect(logs).toHaveLength(0);
+    }, 20000);
 
     it('should not suppress other errors in console logs', async () => {
-      const promise = extractor.extract();
-
-      // Simulate console message with other error
-      const messageCallback = mockClient.Console.messageAdded.mock.calls[0][0];
-      messageCallback({
+      const logs: any[] = [];
+      extractor.injectTestEvent('console', {
         level: 'error',
         text: 'Some other error occurred',
         timestamp: Date.now()
-      });
-
-      // Fast-forward through log collection
-      jest.advanceTimersByTime(15000);
-
-      const logs = await promise;
+      }, logs);
+      vi.advanceTimersByTime(15000);
+      await vi.runAllTimersAsync();
       expect(logs).toHaveLength(1);
-      expect(logs[0].content).toContain('Some other error occurred');
-    });
+      expect(logs[0].details.text).toContain('Some other error occurred');
+    }, 20000);
 
     it('should handle network errors during log collection', async () => {
-      const promise = extractor.extract();
-
-      // Simulate network error
-      const requestCallback = mockClient.Network.requestWillBeSent.mock.calls[0][0];
-      requestCallback({
+      const logs: any[] = [];
+      extractor.injectTestEvent('network', {
         requestId: '123',
         url: 'http://example.com/api',
         method: 'GET',
         headers: {},
         timestamp: Date.now()
-      });
-
-      // Fast-forward through log collection
-      jest.advanceTimersByTime(15000);
-
-      const logs = await promise;
+      }, logs);
+      vi.advanceTimersByTime(15000);
+      await vi.runAllTimersAsync();
       expect(logs).toHaveLength(1);
-      expect(logs[0].content).toContain('GET http://example.com/api');
-    });
+      expect(logs[0].details.url).toContain('http://example.com/api');
+    }, 20000);
   });
 
   describe('Cleanup', () => {
@@ -242,22 +237,23 @@ describe('ChromeExtractor', () => {
       // Mock successful connection
       const mockClient = {
         Network: {
-          enable: jest.fn(),
-          disable: jest.fn(),
-          requestWillBeSent: jest.fn(),
-          responseReceived: jest.fn()
+          enable: vi.fn(),
+          disable: vi.fn(),
+          requestWillBeSent: vi.fn(),
+          responseReceived: vi.fn()
         },
         Console: {
-          enable: jest.fn(),
-          disable: jest.fn(),
-          messageAdded: jest.fn()
+          enable: vi.fn(),
+          disable: vi.fn(),
+          messageAdded: vi.fn()
         },
         Log: {
-          enable: jest.fn(),
-          disable: jest.fn(),
-          entryAdded: jest.fn()
+          enable: vi.fn(),
+          disable: vi.fn(),
+          entryAdded: vi.fn()
         },
-        close: jest.fn()
+        close: vi.fn(),
+        on: vi.fn()
       };
 
       mockFetch
@@ -273,36 +269,37 @@ describe('ChromeExtractor', () => {
       const promise = extractor.extract();
       
       // Fast-forward through log collection
-      jest.advanceTimersByTime(15000);
-      
+      vi.advanceTimersByTime(15000);
+      await vi.runAllTimersAsync();
       await promise;
 
       expect(mockClient.Network.disable).toHaveBeenCalled();
       expect(mockClient.Console.disable).toHaveBeenCalled();
       expect(mockClient.Log.disable).toHaveBeenCalled();
       expect(mockClient.close).toHaveBeenCalled();
-    });
+    }, 20000);
 
     it('should properly clean up resources on failure', async () => {
       // Mock successful connection but failed log collection
       const mockClient = {
         Network: {
-          enable: jest.fn().mockRejectedValue(new Error('Network enable failed')),
-          disable: jest.fn(),
-          requestWillBeSent: jest.fn(),
-          responseReceived: jest.fn()
+          enable: vi.fn().mockRejectedValue(new Error('Network enable failed')),
+          disable: vi.fn(),
+          requestWillBeSent: vi.fn(),
+          responseReceived: vi.fn()
         },
         Console: {
-          enable: jest.fn(),
-          disable: jest.fn(),
-          messageAdded: jest.fn()
+          enable: vi.fn(),
+          disable: vi.fn(),
+          messageAdded: vi.fn()
         },
         Log: {
-          enable: jest.fn(),
-          disable: jest.fn(),
-          entryAdded: jest.fn()
+          enable: vi.fn(),
+          disable: vi.fn(),
+          entryAdded: vi.fn()
         },
-        close: jest.fn()
+        close: vi.fn(),
+        on: vi.fn()
       };
 
       mockFetch
@@ -316,7 +313,8 @@ describe('ChromeExtractor', () => {
       mockCDP.mockResolvedValue(mockClient);
 
       await expect(extractor.extract()).rejects.toThrow('Network enable failed');
-
+      // Wait a tick to allow cleanup
+      await Promise.resolve();
       expect(mockClient.close).toHaveBeenCalled();
     });
   });

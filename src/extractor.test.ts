@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { LogExtractor, ExtractorOptions } from './extractor.js';
 import { mkdir, writeFile, rm } from 'fs/promises';
 import { join } from 'path';
@@ -7,7 +8,7 @@ describe('LogExtractor', () => {
   let testDir: string;
   let options: ExtractorOptions;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     // Create a temporary test directory
     testDir = join(tmpdir(), 'ai-debug-extractor-test-' + Date.now());
     await mkdir(testDir, { recursive: true });
@@ -25,7 +26,7 @@ describe('LogExtractor', () => {
     };
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     // Clean up test directory
     await rm(testDir, { recursive: true, force: true });
   });

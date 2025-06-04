@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest';
 import { ReportGenerator } from './report.js';
 import { ExtractedLog } from './extractor.js';
 

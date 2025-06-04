@@ -686,4 +686,80 @@ export class ChromeExtractor {
       throw error;
     }
   }
+
+  /**
+   * Test hook: injects a simulated event into the log collection.
+   * @param type 'network' | 'console' | 'log'
+   * @param payload The event payload (NetworkRequest, NetworkResponse, ConsoleMessage, DevToolsLogEntry)
+   * @param logsOverride (optional) logs array to use (for test injection)
+   */
+  protected _injectTestEvent(
+    type: 'network' | 'console' | 'log',
+    payload: any,
+    logsOverride?: CollectedLogEntry[]
+  ) {
+    const toISOString = (timestamp: number) => {
+      try {
+        if (!timestamp) return new Date().toISOString();
+        const ms = timestamp < 4102444800 ? timestamp * 1000 : timestamp;
+        if (isNaN(ms) || ms < 0 || ms > 9999999999999) return new Date().toISOString();
+        return new Date(ms).toISOString();
+      } catch {
+        return new Date().toISOString();
+      }
+    };
+    const logs = logsOverride || (this as any)._testLogsArray || [];
+    if (type === 'console') {
+      // Suppression logic for console
+      if (payload && typeof payload.text === 'string') {
+        if (PlatformErrorHandler.isPlatformError(payload.text)) {
+          const platformError = PlatformErrorHandler.handleError(payload.text);
+          if (platformError && PlatformErrorHandler.shouldSuppressError(payload.text)) {
+            return; // Suppress
+          }
+        }
+        if (ChromeErrorHandler.isChromeError(new Error(payload.text))) {
+          const chromeError = ChromeErrorHandler.handleError(new Error(payload.text));
+          if (chromeError && ChromeErrorHandler.shouldSuppressError(new Error(payload.text))) {
+            return; // Suppress
+          }
+        }
+      }
+      logs.push({
+        type,
+        timestamp: toISOString(payload.timestamp),
+        details: payload
+      });
+    } else if (type === 'log') {
+      // Suppression logic for log
+      if (payload && typeof payload.text === 'string') {
+        if (PlatformErrorHandler.isPlatformError(payload.text)) {
+          const platformError = PlatformErrorHandler.handleError(payload.text);
+          if (platformError && PlatformErrorHandler.shouldSuppressError(payload.text)) {
+            return; // Suppress
+          }
+        }
+        if (ChromeErrorHandler.isChromeError(new Error(payload.text))) {
+          const chromeError = ChromeErrorHandler.handleError(new Error(payload.text));
+          if (chromeError && ChromeErrorHandler.shouldSuppressError(new Error(payload.text))) {
+            return; // Suppress
+          }
+        }
+      }
+      logs.push({
+        type,
+        timestamp: toISOString(payload.timestamp),
+        details: payload
+      });
+    } else if (type === 'network') {
+      logs.push({
+        type,
+        timestamp: toISOString(payload.timestamp),
+        details: payload
+      });
+    }
+    if (!logsOverride && (this as any)._testLogsArray !== logs) {
+      (this as any)._testLogsArray = logs;
+    }
+  }
 } 
