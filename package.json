@@ -1,5 +1,5 @@
 {
-  "name": "ai-debug-extractor",
+  "name": "clits",
   "version": "0.3.0",
   "description": "CLI tool and library for extracting and sharing debugging data for AI and web projects.",
   "type": "module",
@@ -15,8 +15,6 @@
     }
   },
   "bin": {
-    "ai-debug-extractor": "dist/cli.js",
-    "ade": "dist/cli.js",
     "clits": "dist/cli.js"
   },
   "files": [

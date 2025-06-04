@@ -1,7 +1,8 @@
 {
+	"name": "CLITS",
 	"folders": [
 		{
-			"name": "AI-Debug-Extractor",
+			"name": "CLITS",
 			"path": "."
 		}
 	],

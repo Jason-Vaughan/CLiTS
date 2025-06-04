@@ -1,4 +1,4 @@
-# AI-Debug-Extractor
+# CLITS
 
 A specialized debugging tool designed for AI assistants to help troubleshoot Chrome-based web applications. This tool extracts, filters, and analyzes debug information to help AI assistants provide better debugging support.
 
@@ -17,7 +17,7 @@ This tool is specifically designed to be used BY AI ASSISTANTS to help users deb
 
 1. Install the package in your project:
    ```bash
-   npm install github:jasonvaughan/ai-debug-extractor
+   npm install github:jasonvaughan/clits
    ```
 
 2. Start Chrome with remote debugging enabled:
@@ -38,7 +38,7 @@ This tool is specifically designed to be used BY AI ASSISTANTS to help users deb
      --user-data-dir=/tmp/chrome-debug
    ```
 
-3. When you encounter an issue, ask your AI assistant for help and mention that you have AI-Debug-Extractor installed.
+3. When you encounter an issue, ask your AI assistant for help and mention that you have CLITS installed.
 
 ## For AI Assistants
 

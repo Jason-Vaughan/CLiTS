@@ -21,8 +21,8 @@ const program = new Command();
 
 async function main(): Promise<void> {
   program
-    .name('ai-debug-extractor')
-    .description('CLI tool for extracting and sharing debugging data for AI and web projects')
+    .name('clits')
+    .description('CLI tool for extracting and sharing debugging data for AI and web projects (CLITS)')
     .version(packageJson.version);
 
   program

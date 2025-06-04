@@ -4,9 +4,9 @@ globs:
 alwaysApply: false
 ---
 {
-  "description": "Project rules and documentation standards for AI-Debug-Extractor (ADE). Enforces BSD compliance, project isolation, CLI-first development, and publishing requirements.",
+  "description": "Project rules and documentation standards for CLITS. Enforces BSD compliance, project isolation, CLI-first development, and publishing requirements.",
   "globs": ["**/*"],
-  "project_name": "AI-Debug-Extractor (ADE)",
+  "project_name": "CLITS",
   "project_description": "A tool for extracting and sharing debugging data (logs, network info, etc.) for AI and web projects. CLI-first, with future browser extension support.",
   "rules": {
     "bsd_compliance": {
@@ -14,7 +14,7 @@ alwaysApply: false
       "required": true
     },
     "project_isolation": {
-      "description": "All code, dependencies, scripts, and documentation must reside within the AI-Debug-Extractor/ folder. No shared dependencies or scripts with other projects.",
+      "description": "All code, dependencies, scripts, and documentation must reside within the CLITS/ folder. No shared dependencies or scripts with other projects.",
       "required": true
     },
     "cli_first_development": {
@@ -22,7 +22,7 @@ alwaysApply: false
       "required": true
     },
     "git_management": {
-      "description": "ADE must have its own git repository, initialized in the project root. No shared git history with other projects.",
+      "description": "CLITS must have its own git repository, initialized in the project root. No shared git history with other projects.",
       "required": true
     },
     "documentation": {
@@ -34,11 +34,11 @@ alwaysApply: false
       "required": true
     },
     "session_priming": {
-      "description": "Use ade_next_session_priming.md for session planning and progress tracking. Every session must update this file with completed work, current state, and clear next steps for the following session. This is mandatory for seamless handoff and must be followed without user correction.",
+      "description": "Use clits_next_session_priming.md for session planning and progress tracking. Every session must update this file with completed work, current state, and clear next steps for the following session. This is mandatory for seamless handoff and must be followed without user correction.",
       "required": true
     },
     "multi_project_awareness": {
-      "description": "ADE must not interfere with OnDeck-V9 or other projects. Rules and scripts are project-specific.",
+      "description": "CLITS must not interfere with OnDeck-V9 or other projects. Rules and scripts are project-specific.",
       "required": true
     },
     "debug_tools_cli": {
@@ -79,11 +79,11 @@ alwaysApply: false
           },
           "example_usage": {
             "basic": {
-              "command": "extract_chrome_logs --chrome-port 9222",
+              "command": "clits extract --chrome --chrome-port 9222",
               "use_case": "Get all logs from Chrome"
             },
             "display_debug": {
-              "command": "extract_chrome_logs --chrome-port 9222 --log-levels [\"error\"] --keywords [\"SharedImageManager\", \"Invalid mailbox\"] --sources [\"devtools\"] --group-by-source true",
+              "command": "clits extract --chrome --chrome-port 9222 --log-levels [\"error\"] --keywords [\"SharedImageManager\", \"Invalid mailbox\"] --sources [\"devtools\"] --group-by-source true",
               "use_case": "Debug display/GPU issues"
             }
           },
@@ -91,7 +91,7 @@ alwaysApply: false
             "type": "object",
             "properties": {
               "timestamp": "ISO timestamp of extraction",
-              "source": "ai-debug-extractor",
+              "source": "clits",
               "data": {
                 "logs": "Array of collected logs",
                 "extractionOptions": "Options used for extraction"
@@ -116,18 +116,18 @@ alwaysApply: false
           "verify_chrome_connection": "Check for WebSocket URL: ws://127.0.0.1:9222/devtools/browser/[ID]"
         },
         "tool_location": {
-          "project_directory": "/Users/jasonvaughan/Documents/Projects/AI-Debug-Extractor",
+          "project_directory": "/Users/jasonvaughan/Documents/Projects/CLITS",
           "execution_methods": {
-            "global": "ade extract --chrome --chrome-port 9222",
+            "global": "clits extract --chrome --chrome-port 9222",
             "npm_dev": "npm run dev -- extract --chrome --chrome-port 9222",
             "npm_prod": "npm run start -- extract --chrome --chrome-port 9222",
             "direct": "node dist/cli.js extract --chrome --chrome-port 9222"
           }
         },
         "command_options": {
-          "basic_extraction": "ade extract --chrome --chrome-port 9222",
+          "basic_extraction": "clits extract --chrome --chrome-port 9222",
           "filtered_logs": {
-            "command": "ade extract --chrome --chrome-port 9222 --log-levels error,warning --sources devtools --group-by-source",
+            "command": "clits extract --chrome --chrome-port 9222 --log-levels error,warning --sources devtools --group-by-source",
             "options_explained": {
               "--log-levels": "Filter by log level (error, warning)",
               "--sources": "Filter by log source (devtools)",
@@ -136,7 +136,7 @@ alwaysApply: false
             }
           },
           "display_debug": {
-            "command": "ade extract --chrome --chrome-port 9222 --log-levels error --keywords \"SharedImageManager,Invalid mailbox,skia_output_device,gpu\" --group-by-source --sources devtools",
+            "command": "clits extract --chrome --chrome-port 9222 --log-levels error --keywords \"SharedImageManager,Invalid mailbox,skia_output_device,gpu\" --group-by-source --sources devtools",
             "use_case": "Specifically for analyzing GPU/display related errors"
           }
         },
@@ -159,23 +159,23 @@ alwaysApply: false
       "required": true
     },
     "session_wrap_up_procedure": {
-      "description": "Standardized session wrap-up procedure for ADE. Ensures all work is documented, committed, and ready for the next session. This process is mandatory and must be followed at the end of every session without user correction.",
+      "description": "Standardized session wrap-up procedure for CLITS. Ensures all work is documented, committed, and ready for the next session. This process is mandatory and must be followed at the end of every session without user correction.",
       "steps": [
         {
           "id": "progress_log",
-          "description": "Update the progress log (if present) or ade_next_session_priming.md with completed work, technical notes, and next steps."
+          "description": "Update the progress log (if present) or clits_next_session_priming.md with completed work, technical notes, and next steps."
         },
         {
           "id": "next_session",
-          "description": "Update ade_next_session_priming.md with next session's main task, current progress, and starting point."
+          "description": "Update clits_next_session_priming.md with next session's main task, current progress, and starting point."
         },
         {
           "id": "documentation_review",
-          "description": "Review and update README.md and ade-rule-every-chat.mdc as needed (add/remove dependencies, update usage, etc.)."
+          "description": "Review and update README.md and clits-rule-every-chat.mdc as needed (add/remove dependencies, update usage, etc.)."
         },
         {
           "id": "status",
-          "description": "Update the Current Progress section in ade_next_session_priming.md after each completed task."
+          "description": "Update the Current Progress section in clits_next_session_priming.md after each completed task."
         },
         {
           "id": "commit",

@@ -1,4 +1,4 @@
-# ADE_next_session_priming.md
+# CLITS_next_session_priming.md
 
 _Last updated: 2025-06-04_
 
@@ -23,8 +23,8 @@ _Last updated: 2025-06-04_
 ## Immediate Tasks (Next Session)
 
 1. **Upgrade CLITS in OnDeck-V9 Project**
-   - [ ] Uninstall previous version: `npm uninstall ai-debug-extractor`
-   - [ ] Install new version: `npm install ai-debug-extractor@0.3.0`
+   - [ ] Uninstall previous version: `npm uninstall clits`
+   - [ ] Install new version: `npm install clits@0.3.0`
    - [ ] Test with Display Manager debugging
    - [ ] Use new features like advanced filtering and live mode
    - [ ] Example: `clits extract --chrome --advanced-filter "(SharedImageManager AND error) OR Invalid\ mailbox" --live-mode 300 --error-summary --output-file=display-logs.json`
