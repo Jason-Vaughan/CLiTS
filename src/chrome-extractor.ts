@@ -442,13 +442,16 @@ export class ChromeExtractor {
   }
 
   async extract(): Promise<ExtractedLog[]> {
+    let client: CDPClient | undefined;
+    let networkEnabled = false;
+    let consoleEnabled = false;
     try {
       logger.info('Connecting to Chrome DevTools...', { options: this.options });
       
       const debuggerUrl = await this.getDebuggerUrl();
       logger.info('Got debugger URL', { debuggerUrl });
       
-      const client = await this.chromeErrorHandler.executeWithRetry(
+      client = await this.chromeErrorHandler.executeWithRetry(
         async () => CDP({ target: debuggerUrl }) as unknown as CDPClient,
         'Connecting to Chrome DevTools'
       );
@@ -507,7 +510,7 @@ export class ChromeExtractor {
             const newDebuggerUrl = await this.getDebuggerUrl();
             
             // Reconnect
-            await client.close();
+            await client!.close();
             
             // Use CDP directly with a callback
             const newClient = await CDP({ target: newDebuggerUrl });
@@ -538,11 +541,13 @@ export class ChromeExtractor {
 
       if (this.options.includeNetwork) {
         await Network.enable();
+        networkEnabled = true;
         logger.info('Network tracking enabled');
       }
       if (this.options.includeConsole) {
         await Console.enable();
         await Log.enable();
+        consoleEnabled = true;
         logger.info('Console tracking enabled');
       }
 
@@ -643,16 +648,7 @@ export class ChromeExtractor {
 
       logger.info(`Collection complete. ${logs.length} logs collected`);
 
-      // Clean up
-      if (this.options.includeNetwork) {
-        await Network.disable();
-      }
-      if (this.options.includeConsole) {
-        await Console.disable();
-        await Log.disable();
-      }
-      await client.close();
-
+      // Clean up (handled in finally)
       const formattedLogs = this.formatLogs(logs);
       logger.info(`Formatted ${formattedLogs.length} logs after filtering`);
       
@@ -684,6 +680,24 @@ export class ChromeExtractor {
 
       logger.error('Failed to extract Chrome DevTools logs', { error });
       throw error;
+    } finally {
+      // Always clean up the client if it was created
+      if (client) {
+        try {
+          if (networkEnabled && client.Network?.disable) {
+            await client.Network.disable();
+          }
+          if (consoleEnabled && client.Console?.disable) {
+            await client.Console.disable();
+          }
+          if (consoleEnabled && client.Log?.disable) {
+            await client.Log.disable();
+          }
+          await client.close();
+        } catch (cleanupError) {
+          logger.warn('Error during Chrome DevTools cleanup', { cleanupError });
+        }
+      }
     }
   }
 

@@ -22,13 +22,16 @@ _Last updated: 2025-06-04_
 
 ## Immediate Tasks (Next Session)
 
-1. **Migrate to Vitest (Jest → Vitest Migration)**
-   - [ ] Remove Jest and ts-jest dependencies
-   - [ ] Install Vitest and related plugins
-   - [ ] Update test scripts in package.json to use Vitest
-   - [ ] Refactor test files for Vitest compatibility (if needed)
-   - [ ] Run and verify all tests with Vitest
-   - [ ] Document any migration issues or changes
+1. **Vitest Migration (Jest → Vitest) [COMPLETED]**
+   - [x] Remove Jest and ts-jest dependencies
+   - [x] Install Vitest and related plugins
+   - [x] Update test scripts in package.json to use Vitest
+   - [x] Refactor test files for Vitest compatibility
+   - [x] Add robust test injection hooks to ChromeExtractor
+   - [x] Run and verify all tests with Vitest
+   - [x] Document migration issues and changes
+   - [x] Commit all changes to git
+   - **Result:** All but one integration test now pass. All log collection and suppression logic is robust and future-proof.
 
 2. **Upgrade CLITS in OnDeck-V9 Project**
    - [ ] Uninstall previous version: `npm uninstall clits`
@@ -49,19 +52,13 @@ _Last updated: 2025-06-04_
    - [ ] Document common error scenarios
 
 ## Recently Completed
-- [x] CLITS tool improvements:
-  - [x] Fixed timestamp handling issues
-  - [x] Fixed log processing errors
-  - [x] Added built-in log file export
-  - [x] Added advanced boolean filtering
-  - [x] Added error summary statistics
-  - [x] Added live mode with duration parameter
-  - [x] Improved reconnection handling
+- [x] CLITS tool improvements
 - [x] Initial CLITS implementation
 - [x] Chrome DevTools Protocol integration
 - [x] Basic log collection working
 - [x] Tool documentation in ade-rule-every-chat.mdc
 - [x] Identified key issues to fix
+- [x] **Vitest migration and test refactor**
 
 ## Known Issues to Address
 
@@ -75,16 +72,22 @@ _Last updated: 2025-06-04_
    - Try the new advanced filtering to isolate specific patterns
    - Use live mode to capture issues as they happen
 
+2. **Test Cleanup on Failure**
+   - The only remaining failing test is `should properly clean up resources on failure` in `chrome-extractor.test.ts`.
+   - **Next session:** Refactor `ChromeExtractor.extract()` to ensure `client.close()` is always called on error, even during setup failures.
+
 ## Progress
 - [x] Basic Chrome connection working
 - [x] Log collection implemented
 - [x] Timestamp handling
 - [x] Error processing
 - [x] Live mode implementation
+- [x] Vitest migration and robust test refactor
 - [ ] Display issue resolution
+- [ ] Test cleanup on failure (next)
 
 ## Next Steps
-1. Migrate to Vitest and update all test infrastructure
+1. Fix cleanup on failure in `ChromeExtractor.extract()` so all tests pass
 2. Upgrade CLITS in the OnDeck-V9 project
 3. Use the improved tool to debug the display manager issues
 4. Document common error patterns and solutions
