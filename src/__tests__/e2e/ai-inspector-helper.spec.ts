@@ -1,7 +1,5 @@
 import { chromium, test, expect } from '@playwright/test';
 
-test.use({ headless: false });
-
 test('AI Inspector Helper: Collect console, network, and DOM info', async () => {
   // Attach to existing Chrome session (user must start Chrome with --remote-debugging-port=9222)
   const browser = await chromium.connectOverCDP('http://localhost:9222');

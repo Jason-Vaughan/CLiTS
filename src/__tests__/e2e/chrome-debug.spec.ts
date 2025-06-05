@@ -10,8 +10,7 @@
  */
 
 import { chromium, test, expect } from '@playwright/test';
-test.use({ headless: false }); // Force headed mode for manual login
-import { waitForInteractiveLogin } from '../src/manual-login';
+import { waitForInteractiveLogin } from '../../manual-login';
 
 test.describe('Displays Manager UI E2E', () => {
   test('should open Add Display dialog and test header options toggles', async () => {
@@ -116,4 +115,8 @@ test.describe('Displays Manager UI E2E', () => {
       console.log('[TEST] Dashboard/user-profile not found. Already logged in or redirected. Skipping assertion.');
     }
   }, 20000);
+});
+
+test('Chrome Debug: Collect console, network, and DOM info', async () => {
+  // ... existing code ...
 }); 

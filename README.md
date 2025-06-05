@@ -1,6 +1,9 @@
 # CLITS - Chrome Log Inspector & Troubleshooting System
 
-<!-- TODO: Add project logo here -->
+<p align="center">
+  <img src="assets/CLiTS Logo.png" alt="CLITS Logo" width="400"/>
+</p>
+
 <!-- Badges: npm version, build status, license, etc. -->
 
 [![npm version](https://img.shields.io/npm/v/clits.svg)](https://www.npmjs.com/package/clits)

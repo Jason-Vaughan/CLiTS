@@ -79,7 +79,7 @@ async function main(): Promise<void> {
             });
             req.on('error', () => reject(new Error('Chrome is not running with remote debugging enabled on port 9222.')));
             req.end();
-          }).catch(err => {
+          }).catch(() => {
             console.error('[CLITS] Error: Chrome must be started with --remote-debugging-port=9222 for --chrome or --interactive-login.');
             process.exit(1);
           });
@@ -205,7 +205,7 @@ async function main(): Promise<void> {
           console.log('Debug data extracted successfully');
         }
       } catch (error) {
-        console.error(`Failed to extract debug data: ${error instanceof Error ? error.message : String(error)}`);
+        console.error('Fatal error:', error);
         process.exit(1);
       }
     });
