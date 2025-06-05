@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { config } from 'dotenv';
-import { ChromeExtractor, ChromeErrorHandler } from 'ai-debug-extractor';
+import { ChromeExtractor, ChromeErrorHandler } from 'clits';
 import { setupLogging } from './utils/logger.js';
 import { debugRouter } from './routes/debug.js';
 import { errorHandler } from './middleware/errorHandler.js';

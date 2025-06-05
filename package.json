@@ -1,6 +1,6 @@
 {
-  "name": "clits",
-  "version": "0.3.0",
+  "name": "@puberty-labs/clits",
+  "version": "1.0.2",
   "description": "Chrome Log Inspector & Troubleshooting System (CLiTS) - A tool for extracting and sharing debugging data for AI and web projects.",
   "type": "module",
   "main": "dist/index.js",
@@ -24,17 +24,18 @@
     "!dist/**/*.test.js",
     "!dist/**/__tests__/**",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "assets/**/*.png"
   ],
   "scripts": {
     "build": "tsc",
     "start": "node dist/cli.js",
     "dev": "node --loader ts-node/esm src/cli.ts",
-    "lint": "eslint src --ext .ts",
+    "lint": "eslint . --ext .ts,.tsx",
     "lint:fix": "eslint src --ext .ts --fix",
     "prepare": "npm run build",
     "prepublishOnly": "npm run test && npm run lint",
-    "test": "vitest run --exclude 'src/**/*.spec.ts'",
+    "test": "vitest run --exclude 'src/**/*.spec.ts' --exclude 'moveto_OnDeck/**/*'",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "vitest run 'src/**/*.spec.ts'"

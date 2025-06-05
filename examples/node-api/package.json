@@ -1,7 +1,7 @@
 {
-  "name": "ai-debug-extractor-node-example",
+  "name": "clits-node-example",
   "version": "0.1.0",
-  "description": "Example Node.js API using AI-Debug-Extractor",
+  "description": "Example Node.js API using CLITS",
   "type": "module",
   "main": "src/index.js",
   "scripts": {
@@ -11,7 +11,7 @@
     "lint:fix": "eslint src --ext .js --fix"
   },
   "dependencies": {
-    "ai-debug-extractor": "file:../..",
+    "clits": "file:../..",
     "express": "^4.18.2",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",

@@ -1,19 +1,37 @@
 # CLiTS - Chrome Log Inspector & Troubleshooting System
 
 <p align="center">
-  <img src="assets/CLiTS Logo.png" alt="CLITS Logo" width="400"/>
+  <img src="https://raw.githubusercontent.com/jasonvaughan/clits/main/assets/CLiTS%20Logo.png" alt="CLITS Logo" width="400"/>
 </p>
 
 <!-- Badges: npm version, build status, license, etc. -->
 
-[![npm version](https://img.shields.io/npm/v/clits.svg)](https://www.npmjs.com/package/clits)
+[![npm version](https://img.shields.io/npm/v/@puberty-labs/clits.svg)](https://www.npmjs.com/package/@puberty-labs/clits)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Getting Started](https://img.shields.io/badge/start%20with-clits--inspect-brightgreen.svg)](#quick-start)
 
 ---
 
-> **CLiTS** (Chrome Log Inspector & Troubleshooting System) is a developer tool for AI-assisted web debugging and automation. It streamlines the process of collecting, structuring, and analyzing browser logs, making it easier for both humans and AI assistants to diagnose issues, automate workflows, and extend browser-based testing.
+> **CLiTS** (Chrome Log Inspector & Troubleshooting System) is a powerful developer tool that bridges the gap between browser debugging and automated analysis. Get started in seconds with the interactive `clits-inspect` wizard, or build custom automation workflows for your specific needs. It's designed to make web application debugging more efficient by:
 >
-> Whether you're troubleshooting a tricky login flow, inspecting network requests, or building custom automation, CLiTS provides a robust, extensible foundation for browser inspection and diagnostics.
+> 🧙‍♂️ **Interactive Wizard**: Start debugging instantly with the guided `clits-inspect` command
+>
+> 🔍 **Automated Log Collection**: Capture Chrome DevTools logs, network requests, and DOM state without manual inspection
+>
+> 🤖 **AI-Ready Output**: Generate structured, parseable output that's perfect for AI analysis and automated debugging
+>
+> 🔄 **Interactive Workflows**: Handle complex scenarios like authenticated sessions and dynamic content with ease
+>
+> 🛠️ **Extensible Architecture**: Build custom automation workflows or integrate with your existing testing infrastructure
+>
+> Whether you're debugging a complex web application, automating browser testing, or building AI-powered developer tools, CLiTS streamlines the process of collecting and analyzing browser data. It's particularly valuable for:
+>
+> - **Developers** troubleshooting hard-to-reproduce issues
+> - **QA Teams** building automated testing pipelines
+> - **AI Assistants** gathering real-time browser diagnostics
+> - **DevOps** monitoring web application health
+>
+> CLiTS turns the tedious process of browser debugging into a streamlined, programmatic workflow.
 
 ---
 
@@ -189,13 +207,18 @@ try {
 
 ## Contributing
 
-Found a bug or have a suggestion? Please open an issue or submit a pull request!
+Found a bug or have a suggestion? We'd love to hear from you! Puberty Labs is committed to continuous improvement of CLiTS and welcomes community feedback.
+
+### Ways to Contribute
+- **npm Feedback**: Leave a review or feedback on our [npm package page](https://www.npmjs.com/package/@puberty-labs/clits)
+- **GitHub Issues**: Open an issue for bugs or feature requests
+- **Pull Requests**: Submit code improvements or documentation updates
 
 ### Local Development
 1. Clone the repo and install dependencies:
    ```sh
-   git clone https://github.com/jasonvaughan/ai-debug-extractor.git
-   cd ai-debug-extractor
+   git clone https://github.com/jasonvaughan/clits.git
+   cd clits
    npm install
    ```
 2. Build the project:
@@ -216,6 +239,8 @@ Found a bug or have a suggestion? Please open an issue or submit a pull request!
 - Add tests for new features or bug fixes
 - Ensure all tests pass and code is linted
 - Open a pull request with a clear description
+
+We appreciate all forms of contribution, from code to documentation to design feedback!
 
 ---
 

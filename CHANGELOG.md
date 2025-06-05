@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2024-06-05
+
+### Added
+- Complete rebranding from AI-Debug-Extractor to CLITS (Chrome Log Inspector & Troubleshooting System)
+- Finalized documentation with comprehensive examples
+- Verified all CLI commands and options
+- Updated example projects with new branding and package name
+
+### Changed
+- Repository name and URLs updated
+- Package name changed to 'clits' on npm
+- All imports and references updated to use new package name
+- Example projects modernized with latest best practices
+
+### Fixed
+- Remaining old branding references
+- Documentation inconsistencies
+- Example project dependencies
+
 ## [0.3.0] - 2024-06-04
 
 ### Added
@@ -59,4 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Connection stability improvements
 - Resource cleanup on error
 
-[0.1.0]: https://github.com/jasonvaughan/ai-debug-extractor/releases/tag/v0.1.0 
+[1.0.0]: https://github.com/jasonvaughan/clits/releases/tag/v1.0.0
+[0.3.0]: https://github.com/jasonvaughan/clits/releases/tag/v0.3.0
+[0.2.0]: https://github.com/jasonvaughan/clits/releases/tag/v0.2.0
+[0.1.0]: https://github.com/jasonvaughan/clits/releases/tag/v0.1.0 

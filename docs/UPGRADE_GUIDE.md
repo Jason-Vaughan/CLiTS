@@ -25,18 +25,18 @@ Version 0.3.0 includes significant improvements to fix critical issues and add r
 
 ```bash
 # Uninstall the previous version
-npm uninstall -g ai-debug-extractor
+npm uninstall -g clits
 
 # Install the new version
-npm install -g ai-debug-extractor@0.3.0
+npm install -g clits@1.0.0
 ```
 
 #### Option 2: Upgrade in a specific project
 
 ```bash
 # In your project directory
-npm uninstall ai-debug-extractor
-npm install ai-debug-extractor@0.3.0
+npm uninstall clits
+npm install clits@1.0.0
 ```
 
 #### Option 3: Install from a local package
@@ -44,7 +44,7 @@ npm install ai-debug-extractor@0.3.0
 If you have received the package file directly:
 
 ```bash
-npm install -g ./path/to/ai-debug-extractor-0.3.0.tgz
+npm install -g ./path/to/clits-1.0.0.tgz
 ```
 
 ### Verify Installation
@@ -53,7 +53,7 @@ To verify you have the correct version installed:
 
 ```bash
 clits --version
-# Should show: 0.3.0
+# Should show: 1.0.0
 ```
 
 ## Using New Features

@@ -1,5 +1,5 @@
 import express from 'express';
-import { ChromeExtractor } from 'ai-debug-extractor';
+import { ChromeExtractor } from 'clits';
 
 const router = express.Router();
 

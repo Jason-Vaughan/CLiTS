@@ -43,9 +43,9 @@ try {
   console.log('Creating package...');
   execSync('npm pack', { cwd: rootDir, stdio: 'inherit' });
 
-  console.log(`Release package created: ai-debug-extractor-${version}.tgz`);
-  console.log('\nInstallation instructions:');
-  console.log(`npm install -g ai-debug-extractor-${version}.tgz`);
+  console.log(`Release package created: clits-${version}.tgz`);
+  console.log('To install globally:');
+  console.log(`npm install -g clits-${version}.tgz`);
   console.log('\nTo publish to npm:');
   console.log('npm publish');
 

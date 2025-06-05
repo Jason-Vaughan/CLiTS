@@ -10,7 +10,7 @@ describe('LogExtractor', () => {
 
   beforeEach(async () => {
     // Create a temporary test directory
-    testDir = join(tmpdir(), 'ai-debug-extractor-test-' + Date.now());
+    testDir = join(tmpdir(), 'clits-test-' + Date.now());
     await mkdir(testDir, { recursive: true });
 
     // Create some test log files

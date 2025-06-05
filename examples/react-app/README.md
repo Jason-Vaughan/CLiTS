@@ -19,12 +19,12 @@ This example demonstrates how to integrate [CLITS](../../README.md) (Chrome Log 
 
 1. **Install dependencies:**
    ```bash
-   npm install ai-debug-extractor
+   npm install clits
    ```
 
 2. **Create a debug utility (`src/utils/debug.ts`):**
    ```typescript
-   import { ChromeExtractor } from 'ai-debug-extractor';
+   import { ChromeExtractor } from 'clits';
 
    export class DebugManager {
      private static instance: DebugManager;

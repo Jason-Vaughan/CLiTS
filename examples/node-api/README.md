@@ -1,4 +1,4 @@
-# AI-Debug-Extractor Node.js API Example
+# CLITS Node.js API Example
 
 This example demonstrates how to integrate [CLITS](../../README.md) (Chrome Log Inspector & Troubleshooting System) into a Node.js API application. It shows how to handle Chrome debugging logs, manage errors, and expose debugging information through REST endpoints.
 

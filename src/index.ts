@@ -3,6 +3,7 @@
 
 export { ChromeExtractor } from './chrome-extractor.js';
 export { LogExtractor } from './extractor.js';
+export { ChromeErrorHandler } from './platform/chrome-error-handler.js';
 export { ReportGenerator } from './report.js';
 
 // Export types
