@@ -1,4 +1,5 @@
-// Main entry point for programmatic usage of AI-Debug-Extractor
+// BSD: Main entry point for programmatic usage of CLiTS (Chrome Log Inspector & Troubleshooting System).
+// Exports core functionality for Chrome debugging, log extraction, and analysis.
 
 export { ChromeExtractor } from './chrome-extractor.js';
 export { LogExtractor } from './extractor.js';

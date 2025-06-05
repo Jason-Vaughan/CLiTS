@@ -6,7 +6,7 @@ export async function waitForInteractiveLogin() {
       input: process.stdin,
       output: process.stdout,
     });
-    rl.question('\n[CLITS] Please log in to the app in the opened browser window, then press Enter to continue...\n', () => {
+    rl.question('\n[CLiTS-INSPECTOR] Please log in to the app in the opened browser window, then press Enter to continue...\n', () => {
       rl.close();
       resolve();
     });

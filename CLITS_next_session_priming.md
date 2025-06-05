@@ -1,46 +1,41 @@
-# CLITS Next Session Priming
+# CLiTS Next Session Priming
 
 ## Current Progress
-- ✅ NPM Account & Authentication ready
-- ✅ Removed hardcoded test files and references
-- ✅ Moved OnDeck-specific tests to `moveto_OnDeck/` directory
-- ✅ Updated CLI to use generic Chrome inspection
-- ✅ Cleaned up project structure
+- Implemented countdown timer for both interactive login and live mode
+- Updated all references from AI-INSPECTOR to CLiTS-INSPECTOR for consistency
+- Fixed branding and naming across the codebase
+- Improved user feedback during login and live mode phases
+- Added clear timeout messages and graceful exits
 
-## Next Session Tasks
-1. Test Release Version
-   - Run a complete test of the generic wizard functionality
-   - Verify all CLI options work as documented
-   - Test file system extraction
-   - Test Chrome DevTools extraction
-   - Verify output formats and logging
+## Next Steps
+1. Test and verify all wizard functionality:
+   - Interactive login wizard
+   - Live mode countdown
+   - Data collection and output
+   - Error handling and timeouts
 
-2. Final Pre-publish Checklist
-   - Review package.json configuration
-   - Verify all dependencies are correctly listed
-   - Check README accuracy
-   - Run npm pack --dry-run one final time
-   - Review included files
-
-3. Publishing
-   - Run npm publish
-   - Create GitHub release
-   - Update documentation with published version
-
-## Technical Notes
-- Generic wizard implementation is in place but needs thorough testing
-- OnDeck-specific tests have been preserved in `moveto_OnDeck/`
-- CLI has been simplified to focus on core functionality
+2. Remaining tasks before publishing:
+   - Update example projects to use new CLiTS branding and package name
+   - Remove any remaining references to AI-Debug-Extractor
+   - Verify all documentation reflects current functionality
+   - Final testing of all CLI commands and options
 
 ## Starting Point for Next Session
-1. Start with testing the generic wizard:
-   ```bash
-   # Start Chrome with debugging
-   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug
+Continue with comprehensive testing of the wizard functionality, focusing on:
+1. Testing both wizards (interactive login and live mode) with various scenarios
+2. Verifying all countdowns and timeouts work as expected
+3. Ensuring consistent CLiTS branding throughout the output
 
-   # Run the wizard
-   npm run start -- extract --chrome --interactive-login
-   ```
+## Technical Notes
+- Current version: 0.3.0
+- Main changes in this session:
+  - Added countdown timers to both interactive login and live mode
+  - Updated branding from AI-INSPECTOR to CLiTS-INSPECTOR
+  - Improved user feedback and error messages
+  - Enhanced timeout handling
 
-2. Then proceed through the pre-publish checklist
-3. Finally, execute the publish steps 
+## Dependencies and Environment
+- Node.js >= 16
+- Chrome with remote debugging enabled (port 9222)
+- Playwright for browser automation
+- TypeScript for development 

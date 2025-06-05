@@ -1,7 +1,7 @@
 {
   "name": "clits",
   "version": "0.3.0",
-  "description": "CLI tool and library for extracting and sharing debugging data for AI and web projects.",
+  "description": "Chrome Log Inspector & Troubleshooting System (CLiTS) - A tool for extracting and sharing debugging data for AI and web projects.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -62,10 +62,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jasonvaughan/ai-debug-extractor.git"
+    "url": "git+https://github.com/jasonvaughan/clits.git"
   },
   "bugs": {
-    "url": "https://github.com/jasonvaughan/ai-debug-extractor/issues"
+    "url": "https://github.com/jasonvaughan/clits/issues"
   },
   "engines": {
     "node": ">=16"

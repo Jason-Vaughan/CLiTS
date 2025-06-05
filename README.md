@@ -1,4 +1,4 @@
-# CLITS - Chrome Log Inspector & Troubleshooting System
+# CLiTS - Chrome Log Inspector & Troubleshooting System
 
 <p align="center">
   <img src="assets/CLiTS Logo.png" alt="CLITS Logo" width="400"/>
@@ -11,9 +11,9 @@
 
 ---
 
-> **CLITS** (Chrome Log Inspector & Troubleshooting System) is a developer tool for AI-assisted web debugging and automation. It streamlines the process of collecting, structuring, and analyzing browser logs, making it easier for both humans and AI assistants to diagnose issues, automate workflows, and extend browser-based testing.
+> **CLiTS** (Chrome Log Inspector & Troubleshooting System) is a developer tool for AI-assisted web debugging and automation. It streamlines the process of collecting, structuring, and analyzing browser logs, making it easier for both humans and AI assistants to diagnose issues, automate workflows, and extend browser-based testing.
 >
-> Whether you're troubleshooting a tricky login flow, inspecting network requests, or building custom automation, CLITS provides a robust, extensible foundation for browser inspection and diagnostics.
+> Whether you're troubleshooting a tricky login flow, inspecting network requests, or building custom automation, CLiTS provides a robust, extensible foundation for browser inspection and diagnostics.
 
 ---
 
@@ -125,24 +125,24 @@ Interactive website inspector for Chrome.
 The inspector outputs information in a structured format for easy AI parsing:
 
 ```
-[AI-INSPECTOR][CONSOLE][log] Console message
-[AI-INSPECTOR][NETWORK][REQUEST] Network request details
-[AI-INSPECTOR][NETWORK][RESPONSE] Network response details
-[AI-INSPECTOR][DOM] DOM structure
+[CLiTS-INSPECTOR][CONSOLE][log] Console message
+[CLiTS-INSPECTOR][NETWORK][REQUEST] Network request details
+[CLiTS-INSPECTOR][NETWORK][RESPONSE] Network response details
+[CLiTS-INSPECTOR][DOM] DOM structure
 ```
 
 ---
 
 ## Examples
 
-- **Node.js API Example:** See [`examples/node-api`](examples/node-api/README.md) for integrating CLITS with an Express API, including REST endpoints for logs and error handling.
+- **Node.js API Example:** See [`examples/node-api`](examples/node-api/README.md) for integrating CLiTS with an Express API, including REST endpoints for logs and error handling.
 - **React Integration Example:** See [`examples/react-app`](examples/react-app/README.md) for capturing debug logs in a React app, error boundaries, and analytics integration.
 
 ---
 
 ## For AI Assistants
 
-CLITS is designed to be easily extended and automated. Here's how you can use it:
+CLiTS is designed to be easily extended and automated. Here's how you can use it:
 
 ### Basic Usage
 ```typescript
@@ -171,7 +171,7 @@ async function inspectWithLogin(url: string, username: string, password: string)
   
   // Your custom inspection
   const logs = await page.evaluate(() => console.logs);
-  console.log('[AI-INSPECTOR][CUSTOM]', logs);
+  console.log('[CLiTS-INSPECTOR][CUSTOM]', logs);
 }
 ```
 
@@ -180,7 +180,7 @@ async function inspectWithLogin(url: string, username: string, password: string)
 try {
   await inspect('https://example.com');
 } catch (error) {
-  console.error('[AI-INSPECTOR][ERROR]', error);
+  console.error('[CLiTS-INSPECTOR][ERROR]', error);
   // Handle errors appropriately
 }
 ```

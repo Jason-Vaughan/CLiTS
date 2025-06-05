@@ -172,12 +172,12 @@ async function inspectWebsite(options: InspectOptions) {
 
     // Collect console messages
     page.on('console', msg => {
-      console.log(`[AI-INSPECTOR][CONSOLE][${msg.type()}]`, msg.text());
+      console.log(`[CLiTS-INSPECTOR][CONSOLE][${msg.type()}]`, msg.text());
     });
 
     // Collect network requests and responses
     page.on('request', request => {
-      console.log(`[AI-INSPECTOR][NETWORK][REQUEST]`, JSON.stringify({
+      console.log(`[CLiTS-INSPECTOR][NETWORK][REQUEST]`, JSON.stringify({
         url: request.url(),
         method: request.method(),
         headers: request.headers(),
@@ -195,7 +195,7 @@ async function inspectWebsite(options: InspectOptions) {
       } catch (e) {
         body = '[UNREADABLE BODY]';
       }
-      console.log(`[AI-INSPECTOR][NETWORK][RESPONSE]`, JSON.stringify({
+      console.log(`[CLiTS-INSPECTOR][NETWORK][RESPONSE]`, JSON.stringify({
         url: response.url(),
         status: response.status(),
         statusText: response.statusText(),
@@ -206,7 +206,7 @@ async function inspectWebsite(options: InspectOptions) {
 
     // Dump DOM structure
     const dom = await page.content();
-    console.log('[AI-INSPECTOR][DOM]', dom.slice(0, 5000)); // limit output size
+    console.log('[CLiTS-INSPECTOR][DOM]', dom.slice(0, 5000)); // limit output size
 
     spinner.succeed('Diagnostics completed');
     console.log(chalk.green('\nResults are ready for your AI session!'));
@@ -233,7 +233,7 @@ async function inspectWebsite(options: InspectOptions) {
       } else if (action === 'capture') {
         spinner.start('Capturing page state...');
         const dom = await page.content();
-        console.log('[AI-INSPECTOR][DOM]', dom.slice(0, 5000));
+        console.log('[CLiTS-INSPECTOR][DOM]', dom.slice(0, 5000));
         spinner.succeed('Page state captured');
       } else if (action === 'navigate') {
         const { url } = await inquirer.prompt([
@@ -269,7 +269,7 @@ async function inspectWebsite(options: InspectOptions) {
 }
 
 async function main() {
-  console.log(chalk.blue('\nCLITS - Chrome Log Inspector & Troubleshooting System'));
+  console.log(chalk.blue('\nCLiTS - Chrome Log Inspector & Troubleshooting System'));
   console.log(chalk.gray('Generic Website Inspector\n'));
 
   try {
