@@ -1,59 +1,46 @@
 # CLITS Next Session Priming
 
-## Completed This Session
-- Added project logo to assets/ directory and README.md
-- Removed unnecessary SVG version of logo (was flattened)
-- Updated package.json with corrected repository URL
-- Previous tasks remain completed (documentation, build, etc.)
+## Current Progress
+- ✅ NPM Account & Authentication ready
+- ✅ Removed hardcoded test files and references
+- ✅ Moved OnDeck-specific tests to `moveto_OnDeck/` directory
+- ✅ Updated CLI to use generic Chrome inspection
+- ✅ Cleaned up project structure
+
+## Next Session Tasks
+1. Test Release Version
+   - Run a complete test of the generic wizard functionality
+   - Verify all CLI options work as documented
+   - Test file system extraction
+   - Test Chrome DevTools extraction
+   - Verify output formats and logging
+
+2. Final Pre-publish Checklist
+   - Review package.json configuration
+   - Verify all dependencies are correctly listed
+   - Check README accuracy
+   - Run npm pack --dry-run one final time
+   - Review included files
+
+3. Publishing
+   - Run npm publish
+   - Create GitHub release
+   - Update documentation with published version
 
 ## Technical Notes
-- `files` field in package.json ensures only dist/, README.md, and LICENSE are published
-- AI assistants and users can run CLITS directly via CLI (wizard is optional)
-- All usage and integration info is in the README and CLI help output
-- Project logo added in PNG format for better compatibility
+- Generic wizard implementation is in place but needs thorough testing
+- OnDeck-specific tests have been preserved in `moveto_OnDeck/`
+- CLI has been simplified to focus on core functionality
 
-## Release Checklist
-### 1. Code & Build
-- [x] Ensure all source code is clean, documented, and BSD-compliant ✓
-  - Added BSD headers to key files (cli.ts, chrome-extractor.ts, extractor.ts)
-  - Fixed linter errors and warnings
-- [x] Build the CLI (ensure `dist/` is up-to-date) ✓
-- [x] Remove any sensitive/private files from publishable output ✓
-  - Removed .DS_Store
-  - Removed clits-rule-every-chat.OLD
-  - Removed test package (clits-0.3.0.tgz)
-  - Organized chrome debug scripts into scripts/chrome-debug/
+## Starting Point for Next Session
+1. Start with testing the generic wizard:
+   ```bash
+   # Start Chrome with debugging
+   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug
 
-### 2. Documentation
-- [x] README.md: Project goals, usage, install steps, BSD compliance, AI assistant integration ✓
-- [x] DEBUG_TOOLS.md: Full CLI tool usage, options, and integration details (covered in README.md) ✓
-- [x] LICENSE: MIT or BSD license present and correct ✓
-- [x] clits_next_session_priming.md: Updated with current state and next steps ✓
+   # Run the wizard
+   npm run start -- extract --chrome --interactive-login
+   ```
 
-### 3. Package & NPM
-- [x] package.json: Name, version, description, bin entry, keywords, author, license, repository ✓
-- [x] .npmignore or files field: Only include necessary files ✓
-- [x] Test install locally: `npm pack` successful ✓
-- [x] Fixed package.json warnings with `npm pkg fix` ✓
-
-### 4. Git & Versioning
-- [x] All changes committed and pushed ✓
-- [x] Tag the release (v0.3.0 tag already exists) ✓
-
-### 5. Publish
-- [x] npm publish dry run successful ✓
-- [ ] Create npm account
-- [ ] Configure npm authentication
-- [ ] npm publish (actual)
-- [ ] Announce/release notes (optional)
-
-## Next Steps
-- Create and set up npm account
-- Configure local npm authentication
-- Manually remove test files and unnecessary content from dist/ before publishing
-- Double-check project root for any files that should not be published
-- Final review of documentation and CLI usability
-- Prepare for npm publish
-
-## Main Task for Next Session
-Set up npm account and authentication, then proceed with final cleanup and publishing. 
+2. Then proceed through the pre-publish checklist
+3. Finally, execute the publish steps 

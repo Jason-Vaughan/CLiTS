@@ -19,14 +19,17 @@
     "clits-inspect": "dist/cli-inspect.js"
   },
   "files": [
-    "dist",
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "!dist/**/*.test.js",
+    "!dist/**/__tests__/**",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
     "build": "tsc",
     "start": "node dist/cli.js",
-    "dev": "ts-node src/cli.ts",
+    "dev": "node --loader ts-node/esm src/cli.ts",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
     "prepare": "npm run build",
