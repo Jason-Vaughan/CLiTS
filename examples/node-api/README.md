@@ -1,43 +1,43 @@
 # AI-Debug-Extractor Node.js API Example
 
-This example demonstrates how to integrate AI-Debug-Extractor into a Node.js API application. It shows how to handle Chrome debugging logs, manage errors, and expose debugging information through REST endpoints.
+This example demonstrates how to integrate [CLITS](../../README.md) (Chrome Log Inspector & Troubleshooting System) into a Node.js API application. It shows how to handle Chrome debugging logs, manage errors, and expose debugging information through REST endpoints.
 
 ## Features
 
 - Express.js REST API
-- Chrome Debug Protocol integration
+- Chrome Debug Protocol integration via CLITS
 - Error handling and logging
 - Configurable retry logic
 - Environment-based configuration
 
 ## Prerequisites
 
-- Node.js >= 16
-- Google Chrome browser
-- AI-Debug-Extractor library
+- **Node.js** >= 16
+- **Google Chrome** (latest recommended)
+- **CLITS** (installed globally or as a dependency)
 
 ## Setup
 
-1. Install dependencies:
+1. **Install dependencies:**
    ```bash
    npm install
    ```
 
-2. Create a `.env` file in the root directory:
+2. **Create a `.env` file in the root directory:**
    ```env
    PORT=3000
    LOG_LEVEL=info
    NODE_ENV=development
    ```
 
-3. Start Chrome with remote debugging enabled:
+3. **Start Chrome with remote debugging enabled:**
    ```bash
    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
      --remote-debugging-port=9222 \
      --user-data-dir=/tmp/chrome-debug
    ```
 
-4. Start the API server:
+4. **Start the API server:**
    ```bash
    npm run dev
    ```
@@ -81,8 +81,8 @@ The example includes comprehensive error handling:
 
 Logs are written to:
 - Console (all levels, colored output)
-- error.log (error level only)
-- combined.log (all levels)
+- `error.log` (error level only)
+- `combined.log` (all levels)
 
 ## Configuration
 
@@ -93,19 +93,19 @@ The ChromeExtractor is configured with:
 
 ## Example Usage
 
-1. Start Chrome with remote debugging:
+1. **Start Chrome with remote debugging:**
    ```bash
    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
      --remote-debugging-port=9222 \
      --user-data-dir=/tmp/chrome-debug
    ```
 
-2. Start the API server:
+2. **Start the API server:**
    ```bash
    npm run dev
    ```
 
-3. Make requests to the API:
+3. **Make requests to the API:**
    ```bash
    # Get all logs
    curl http://localhost:3000/api/debug/logs
@@ -124,7 +124,7 @@ The ChromeExtractor is configured with:
 
 The API handles various error scenarios:
 
-```javascript
+```json
 // Chrome connection error
 {
   "error": "Chrome Extractor Error",
@@ -146,4 +146,8 @@ The API handles various error scenarios:
   "error": "Internal Server Error",
   "message": "An unexpected error occurred"
 }
-``` 
+```
+
+---
+
+For more details and advanced usage, see the [main CLITS documentation](../../README.md). 
