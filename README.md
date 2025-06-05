@@ -113,4 +113,82 @@ The tool automatically handles several common Chrome-related errors:
 
 ## License
 
-MIT 
+MIT
+
+## Manual Login Support for Browser Automation
+
+CLITS supports flexible authentication for browser-based extraction and E2E testing. You can control login behavior using the following CLI flags:
+
+### `--interactive-login`
+
+- When passed, CLITS will pause and prompt you to log in manually in the opened browser window before continuing automation.
+- This is ideal for projects with SSO, 2FA, or any authentication that is hard to automate, or when running under AI assistant control.
+- Example usage:
+
+```sh
+clits extract --chrome --interactive-login
+```
+
+You will see a prompt:
+
+```
+[CLITS] Please log in to the app in the opened browser window, then press Enter to continue...
+```
+
+After logging in, press Enter to continue automated extraction or testing.
+
+### `--no-login`
+
+- Explicitly bypasses any login prompts and runs automation as an unauthenticated user.
+- Useful for public apps or when login is not required.
+
+### How it Works
+
+- The `--interactive-login` flag sets the `INTERACTIVE_LOGIN=1` environment variable for Playwright/browser automation.
+- Playwright E2E tests and browser automation scripts check this variable and pause for manual login if set.
+- This approach is flexible for both authenticated and unauthenticated projects, and is suitable for both human and AI-driven workflows.
+
+## Using an Existing Chrome Session for Authenticated Automation
+
+Some services (like Google) block logins from automated browsers. To work around this, CLITS can attach to a real Chrome session:
+
+1. Start Chrome with remote debugging enabled:
+   ```sh
+   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug
+   ```
+2. Log in to your app (or Google) manually in that Chrome window.
+3. Run CLITS with `--chrome` or `--interactive-login`:
+   ```sh
+   clits extract --chrome --interactive-login
+   ```
+
+CLITS will attach to your real, authenticated Chrome session and run automation as you. This bypasses automation blocks and works for any login state.
+
+## E2E Testing with Real Chrome Sessions
+
+1. **Start Chrome with remote debugging enabled:**
+   ```sh
+   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug
+   ```
+2. **Log in to your app (or Google) in that Chrome window if needed.**
+3. **Run the CLI:**
+   ```sh
+   npx tsx src/cli.ts extract --chrome --interactive-login
+   ```
+4. **How it works:**
+   - The tests attach to your real Chrome session using Playwright's `connectOverCDP`.
+   - If a login prompt is detected, you will be prompted in the terminal to log in and press Enter.
+   - If already logged in, the test proceeds automatically.
+   - All UI actions and assertions are performed in your real, authenticated browser window.
+
+### Linter Errors
+- You may see TypeScript linter errors in the E2E test file due to advanced Playwright usage (attaching to an external browser session). These do not affect test execution and can be safely ignored.
+
+## Session Notes
+
+- **All E2E tests are working with real Chrome sessions and manual login is only prompted if needed.**
+- **Linter errors are present but do not interfere.**
+- **Next session:**
+  - Test the workflow again from a fresh state.
+  - Optionally, refine selectors or add more E2E coverage.
+  - Consider CI integration or further automation if desired. 

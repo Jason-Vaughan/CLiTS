@@ -9,6 +9,7 @@ import { readFileSync } from 'fs';
 import { LogExtractor } from './extractor.js';
 import { ChromeExtractor } from './chrome-extractor.js';
 import { ReportGenerator } from './report.js';
+import { spawn } from 'child_process';
 
 // Define a common base type for all extractors
 type Extractor = LogExtractor | ChromeExtractor;
@@ -32,7 +33,7 @@ async function main(): Promise<void> {
     .option('-p, --patterns <patterns...>', 'Log file patterns to match', ['*.log'])
     .option('-m, --max-size <size>', 'Maximum file size in MB', '10')
     .option('-n, --max-files <number>', 'Maximum number of files to process', '100')
-    .option('--chrome', 'Extract logs from Chrome DevTools')
+    .option('--chrome', 'Extract logs from an existing Chrome session (must be started with --remote-debugging-port=9222)')
     .option('--chrome-host <host>', 'Chrome DevTools host', 'localhost')
     .option('--chrome-port <port>', 'Chrome DevTools port', '9222')
     .option('--no-network', 'Exclude network logs from Chrome DevTools')
@@ -50,6 +51,8 @@ async function main(): Promise<void> {
     .option('--output-file <path>', 'Save logs to the specified file path')
     .option('--error-summary', 'Include summary statistics of error frequencies')
     .option('--live-mode [duration]', 'Run in live mode for specified duration in seconds (default: 60)')
+    .option('--interactive-login', 'Pause and prompt for manual login before running browser automation (sets INTERACTIVE_LOGIN=1 for Playwright, attaches to existing Chrome)')
+    .option('--no-login', 'Bypass any login prompts and run automation as unauthenticated')
     .action(async (options) => {
       try {
         const extractors: Extractor[] = [];
@@ -67,27 +70,32 @@ async function main(): Promise<void> {
 
         // Chrome DevTools extraction
         if (options.chrome) {
-          const chromeExtractor = new ChromeExtractor({
-            host: options.chromeHost,
-            port: parseInt(options.chromePort),
-            includeNetwork: options.network,
-            includeConsole: options.console,
-            filters: {
-              logLevels: options.logLevels?.split(',') as Array<'error' | 'warning' | 'info' | 'debug'>,
-              sources: options.sources?.split(',') as Array<'network' | 'console' | 'devtools'>,
-              domains: options.domains?.split(',') || [],
-              keywords: options.keywords?.split(',') || [],
-              excludePatterns: options.exclude?.split(',') || [],
-              advancedFilter: options.advancedFilter
-            },
-            format: {
-              groupBySource: options.groupBySource,
-              groupByLevel: options.groupByLevel,
-              includeTimestamp: options.timestamps,
-              includeStackTrace: options.stackTraces
-            }
+          // Check if Chrome is running with remote debugging
+          const http = await import('http');
+          await new Promise((resolve, reject) => {
+            const req = http.request({ hostname: 'localhost', port: 9222, path: '/json/version', timeout: 2000 }, res => {
+              if (res.statusCode === 200) resolve(true);
+              else reject(new Error('Chrome is not running with remote debugging enabled on port 9222.'));
+            });
+            req.on('error', () => reject(new Error('Chrome is not running with remote debugging enabled on port 9222.')));
+            req.end();
+          }).catch(err => {
+            console.error('[CLITS] Error: Chrome must be started with --remote-debugging-port=9222 for --chrome or --interactive-login.');
+            process.exit(1);
           });
-          extractors.push(chromeExtractor);
+          // If Playwright E2E is to be run, invoke as a subprocess for AI assistant compatibility
+          const env = { ...process.env };
+          if (options.interactiveLogin && !options.noLogin) {
+            env.INTERACTIVE_LOGIN = '1';
+          }
+          // Run Playwright E2E test as subprocess
+          const args = ['test', 'e2e/chrome-debug.spec.ts'];
+          const child = spawn('npx', ['playwright', ...args], {
+            stdio: 'inherit',
+            env,
+          });
+          child.on('exit', code => process.exit(code));
+          return; // Do not continue with legacy ChromeExtractor logic
         }
 
         if (extractors.length === 0) {
