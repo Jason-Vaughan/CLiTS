@@ -1,194 +1,105 @@
-# CLITS
+# CLITS - Chrome Log Inspector & Troubleshooting System
 
-A specialized debugging tool designed for AI assistants to help troubleshoot Chrome-based web applications. This tool extracts, filters, and analyzes debug information to help AI assistants provide better debugging support.
+A powerful tool for AI-assisted web debugging and troubleshooting.
 
-## Important Note
+## Features
 
-This tool is specifically designed to be used BY AI ASSISTANTS to help users debug their applications. It is not intended to be used directly as a general-purpose debugging library.
+- Generic website inspection with automatic log collection
+- Console, network, and DOM inspection
+- Interactive login handling
+- AI-friendly output format
+- Extensible for custom automation
 
-## Prerequisites
+## Installation
 
-- Node.js >= 16
-- Google Chrome
-- A project you want to debug
-- An AI assistant that understands how to use this tool
+```sh
+npm install -g clits
+```
 
 ## Quick Start
 
-1. Install the package in your project:
-   ```bash
-   npm install github:jasonvaughan/clits
-   ```
+1. Start Chrome with remote debugging enabled:
+```sh
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug
+```
 
-2. Start Chrome with remote debugging enabled:
-   ```bash
-   # On macOS
-   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
-     --remote-debugging-port=9222 \
-     --user-data-dir=/tmp/chrome-debug
+2. Run the generic website inspector:
+```sh
+clits-inspect
+```
 
-   # On Windows
-   "C:\Program Files\Google\Chrome\Application\chrome.exe" \
-     --remote-debugging-port=9222 \
-     --user-data-dir=%TEMP%\chrome-debug
+3. Follow the interactive prompts:
+   - Enter the website URL
+   - Choose whether to wait for login
+   - Complete login within 30 seconds if needed
+   - View the diagnostic output
 
-   # On Linux
-   google-chrome \
-     --remote-debugging-port=9222 \
-     --user-data-dir=/tmp/chrome-debug
-   ```
+## Output Format
 
-3. When you encounter an issue, ask your AI assistant for help and mention that you have CLITS installed.
+The inspector outputs information in a structured format for easy AI parsing:
+
+```
+[AI-INSPECTOR][CONSOLE][log] Console message
+[AI-INSPECTOR][NETWORK][REQUEST] Network request details
+[AI-INSPECTOR][NETWORK][RESPONSE] Network response details
+[AI-INSPECTOR][DOM] DOM structure
+```
 
 ## For AI Assistants
 
-This tool provides several capabilities to help diagnose issues:
+CLITS is designed to be easily extended and automated. Here's how you can use it:
 
-1. **Chrome Log Collection**:
-   - Console logs (error, warning, info)
-   - Network requests and responses
-   - Runtime exceptions
-   - Performance metrics
+### Basic Usage
+```typescript
+import { chromium } from 'playwright';
 
-2. **Error Handling**:
-   - Automatic retry with exponential backoff
-   - Known error suppression
-   - Platform-specific error handling
-
-3. **Log Analysis**:
-   - Pattern matching
-   - Error categorization
-   - Context preservation
-
-### Common Error Patterns
-
-The tool automatically handles several common Chrome-related errors:
-
-- `DEPRECATED_ENDPOINT` registration errors
-- `TASK_CATEGORY_POLICY` errors on macOS
-- Chrome startup and connection issues
-- WebSocket connection failures
-
-### Configuration Options
-
-```javascript
-{
-  port: 9222,                    // Chrome debugging port
-  retryOptions: {
-    maxAttempts: 3,              // Maximum connection attempts
-    initialDelay: 1000,          // Initial retry delay (ms)
-    maxDelay: 5000               // Maximum retry delay (ms)
-  },
-  errorHandler: {
-    suppressErrors: ['TASK_CATEGORY_POLICY'],  // Errors to suppress
-    logErrors: true              // Whether to log suppressed errors
-  }
+async function inspect(url: string) {
+  const browser = await chromium.connectOverCDP('http://localhost:9222');
+  const page = browser.contexts()[0].pages()[0];
+  await page.goto(url);
+  // Add your custom inspection logic here
 }
 ```
 
-## Troubleshooting Guide
+### Custom Automation
+```typescript
+// Example: Automated login and inspection
+async function inspectWithLogin(url: string, username: string, password: string) {
+  const browser = await chromium.connectOverCDP('http://localhost:9222');
+  const page = browser.contexts()[0].pages()[0];
+  await page.goto(url);
+  
+  // Custom login logic
+  await page.fill('#username', username);
+  await page.fill('#password', password);
+  await page.click('#login-button');
+  
+  // Your custom inspection
+  const logs = await page.evaluate(() => console.logs);
+  console.log('[AI-INSPECTOR][CUSTOM]', logs);
+}
+```
 
-1. **Chrome Connection Issues**:
-   - Ensure Chrome is running with remote debugging enabled
-   - Check if the debugging port (9222) is available
-   - Verify no other instances are using the debug directory
+### Error Handling
+```typescript
+try {
+  await inspect('https://example.com');
+} catch (error) {
+  console.error('[AI-INSPECTOR][ERROR]', error);
+  // Handle errors appropriately
+}
+```
 
-2. **Permission Issues**:
-   - On macOS, task policy errors can be ignored
-   - On Linux, ensure proper Chrome installation
-   - On Windows, run Chrome with appropriate permissions
+## Contributing
 
-3. **Data Collection Issues**:
-   - Ensure Chrome is running the page you want to debug
-   - Check network connectivity
-   - Verify Chrome version compatibility
+Found a bug or have a suggestion? Please open an issue or submit a pull request!
 
-## Version History
-
-- 0.1.0: Initial release
-  - Basic log collection
-  - Error handling
-  - Chrome integration
-  - Platform-specific fixes
+### For AI Assistants
+When reporting bugs or suggesting improvements:
+1. Use the `[AI-INSPECTOR]` prefix in logs
+2. Include relevant console/network logs
+3. Suggest specific code changes or improvements
 
 ## License
 
-MIT
-
-## Manual Login Support for Browser Automation
-
-CLITS supports flexible authentication for browser-based extraction and E2E testing. You can control login behavior using the following CLI flags:
-
-### `--interactive-login`
-
-- When passed, CLITS will pause and prompt you to log in manually in the opened browser window before continuing automation.
-- This is ideal for projects with SSO, 2FA, or any authentication that is hard to automate, or when running under AI assistant control.
-- Example usage:
-
-```sh
-clits extract --chrome --interactive-login
-```
-
-You will see a prompt:
-
-```
-[CLITS] Please log in to the app in the opened browser window, then press Enter to continue...
-```
-
-After logging in, press Enter to continue automated extraction or testing.
-
-### `--no-login`
-
-- Explicitly bypasses any login prompts and runs automation as an unauthenticated user.
-- Useful for public apps or when login is not required.
-
-### How it Works
-
-- The `--interactive-login` flag sets the `INTERACTIVE_LOGIN=1` environment variable for Playwright/browser automation.
-- Playwright E2E tests and browser automation scripts check this variable and pause for manual login if set.
-- This approach is flexible for both authenticated and unauthenticated projects, and is suitable for both human and AI-driven workflows.
-
-## Using an Existing Chrome Session for Authenticated Automation
-
-Some services (like Google) block logins from automated browsers. To work around this, CLITS can attach to a real Chrome session:
-
-1. Start Chrome with remote debugging enabled:
-   ```sh
-   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug
-   ```
-2. Log in to your app (or Google) manually in that Chrome window.
-3. Run CLITS with `--chrome` or `--interactive-login`:
-   ```sh
-   clits extract --chrome --interactive-login
-   ```
-
-CLITS will attach to your real, authenticated Chrome session and run automation as you. This bypasses automation blocks and works for any login state.
-
-## E2E Testing with Real Chrome Sessions
-
-1. **Start Chrome with remote debugging enabled:**
-   ```sh
-   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug
-   ```
-2. **Log in to your app (or Google) in that Chrome window if needed.**
-3. **Run the CLI:**
-   ```sh
-   npx tsx src/cli.ts extract --chrome --interactive-login
-   ```
-4. **How it works:**
-   - The tests attach to your real Chrome session using Playwright's `connectOverCDP`.
-   - If a login prompt is detected, you will be prompted in the terminal to log in and press Enter.
-   - If already logged in, the test proceeds automatically.
-   - All UI actions and assertions are performed in your real, authenticated browser window.
-
-### Linter Errors
-- You may see TypeScript linter errors in the E2E test file due to advanced Playwright usage (attaching to an external browser session). These do not affect test execution and can be safely ignored.
-
-## Session Notes
-
-- **All E2E tests are working with real Chrome sessions and manual login is only prompted if needed.**
-- **Linter errors are present but do not interfere.**
-- **Next session:**
-  - Test the workflow again from a fresh state.
-  - Optionally, refine selectors or add more E2E coverage.
-  - Consider CI integration or further automation if desired. 
+MIT License - See LICENSE file for details 
