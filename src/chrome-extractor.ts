@@ -1,3 +1,6 @@
+// BSD: Chrome DevTools Protocol integration for extracting logs, network requests, and console output from Chrome browser sessions.
+// Provides advanced filtering, formatting, and error handling capabilities for browser-based debugging.
+
 import CDP from 'chrome-remote-interface';
 import { ExtractedLog } from './extractor.js';
 import { createLogger, format, transports } from 'winston';

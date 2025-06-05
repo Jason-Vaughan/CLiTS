@@ -1,3 +1,6 @@
+// BSD: Base log extraction functionality for reading and processing log files from the filesystem.
+// Provides configurable file size limits, pattern matching, and error handling for log collection.
+
 import { createLogger, format, transports } from 'winston';
 import { glob } from 'glob';
 import { readFile } from 'fs/promises';
