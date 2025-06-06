@@ -79,7 +79,8 @@ describe('ChromeExtractor', () => {
     vi.useFakeTimers();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await vi.runAllTimersAsync();
     vi.useRealTimers();
   });
 
@@ -97,22 +98,22 @@ describe('ChromeExtractor', () => {
       // Mock CDP connection with DEPRECATED_ENDPOINT error then success
       const mockClient = {
         Network: {
-          enable: vi.fn(),
-          disable: vi.fn(),
+          enable: vi.fn().mockResolvedValue(undefined),
+          disable: vi.fn().mockResolvedValue(undefined),
           requestWillBeSent: vi.fn(),
           responseReceived: vi.fn()
         },
         Console: {
-          enable: vi.fn(),
-          disable: vi.fn(),
+          enable: vi.fn().mockResolvedValue(undefined),
+          disable: vi.fn().mockResolvedValue(undefined),
           messageAdded: vi.fn()
         },
         Log: {
-          enable: vi.fn(),
-          disable: vi.fn(),
+          enable: vi.fn().mockResolvedValue(undefined),
+          disable: vi.fn().mockResolvedValue(undefined),
           entryAdded: vi.fn()
         },
-        close: vi.fn(),
+        close: vi.fn().mockResolvedValue(undefined),
         on: vi.fn()
       };
 
@@ -123,17 +124,16 @@ describe('ChromeExtractor', () => {
       const promise = extractor.extract();
       
       // Fast-forward through the retry delay
-      vi.advanceTimersByTime(100);
-      await vi.runAllTimersAsync();
+      await vi.advanceTimersByTimeAsync(100);
       await promise;
 
       expect(mockCDP).toHaveBeenCalledTimes(2);
       expect(mockClient.Network.enable).toHaveBeenCalled();
       expect(mockClient.Console.enable).toHaveBeenCalled();
       expect(mockClient.Log.enable).toHaveBeenCalled();
-    }, 20000);
+    });
 
-    it('should handle connection failures with retries', () => {
+    it('should handle connection failures with retries', async () => {
       // Mock version check success
       mockFetch
         .mockResolvedValueOnce(createMockResponse(true))
@@ -151,13 +151,12 @@ describe('ChromeExtractor', () => {
 
       // Fast-forward through all retry delays
       for (let i = 0; i < 3; i++) {
-        vi.advanceTimersByTime(100 * Math.pow(2, i));
+        await vi.advanceTimersByTimeAsync(100 * Math.pow(2, i));
       }
-      return vi.runAllTimersAsync().then(() =>
-        expect(promise).rejects.toThrow('Failed to connect to Chrome debugging endpoint')
-      );
+
+      await expect(promise).rejects.toThrow('Failed to connect to Chrome debugging endpoint');
       expect(mockCDP).toHaveBeenCalledTimes(3);
-    }, 20000);
+    });
 
     it('should not retry on non-recoverable errors', async () => {
       // Mock version check failure
