@@ -15,5 +15,5 @@ jobs:
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
-      - run: npm ci
+      - run: npm install --no-audit --no-fund
       - run: npm test 
