@@ -4,11 +4,14 @@
     "module": "ES2020",
     "moduleResolution": "node",
     "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "outDir": "./dist",
     "rootDir": "./src",
     "strict": true,
-    "declaration": true
+    "declaration": true,
+    "typeRoots": ["./node_modules/@types", "./src/types"],
+    "types": ["node"]
   },
-  "include": ["src/**/*"],
-  "exclude": ["src/**/*.spec.ts", "src/**/*.test.ts", "src/**/__tests__/**/*"]
+  "include": ["src/**/*", "src/**/*.d.ts", "src/**/*.test.ts", "src/**/__tests__/**/*"],
+  "exclude": []
 } 

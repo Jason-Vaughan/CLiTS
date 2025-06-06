@@ -1,30 +1,36 @@
 declare module 'chrome-remote-interface' {
   interface CDPClient {
     Network: {
-      enable(): Promise<void>;
-      disable(): Promise<void>;
-      requestWillBeSent(callback: (params: any) => void): void;
-      responseReceived(callback: (params: any) => void): void;
+      enable: () => Promise<void>;
+      disable: () => Promise<void>;
+      requestWillBeSent: () => void;
+      responseReceived: () => void;
     };
     Console: {
-      enable(): Promise<void>;
-      disable(): Promise<void>;
-      messageAdded(callback: (params: any) => void): void;
+      enable: () => Promise<void>;
+      disable: () => Promise<void>;
+      messageAdded: () => void;
     };
     Log: {
-      enable(): Promise<void>;
-      disable(): Promise<void>;
-      entryAdded(callback: (params: any) => void): void;
+      enable: () => Promise<void>;
+      disable: () => Promise<void>;
+      entryAdded: () => void;
     };
-    close(): Promise<void>;
+    close: () => Promise<void>;
+    on: (event: string, callback: (data: unknown) => void) => void;
   }
 
   interface CDPOptions {
     host?: string;
     port?: number;
-    target?: string;
+    target?: string | ((targets: any[]) => string | undefined);
+    local?: boolean;
+    protocol?: any;
+    remote?: boolean;
+    alterPath?: (path: string) => string;
+    useHostName?: boolean;
   }
 
   function CDP(options?: CDPOptions): Promise<CDPClient>;
-  export default CDP;
+  export = CDP;
 } 

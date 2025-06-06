@@ -1,7 +1,11 @@
+/// <reference types="vitest" />
 import { ChromeExtractor } from '../chrome-extractor.js';
 import CDP from 'chrome-remote-interface';
 import fetch, { Response, Headers } from 'node-fetch';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, SpyInstance } from 'vitest';
+import type { ConsoleMessage, DevToolsLogEntry, NetworkRequest, NetworkResponse } from '../types/chrome-types.js';
+import type { ExtractedLog } from '../types/extractor.js';
+import type { CDPClient } from 'chrome-remote-interface';
 
 // Ensure we're using mocks in CI environment
 if (process.env.CI || process.env.CHROME_TEST_MODE === 'mock') {
@@ -12,7 +16,7 @@ if (process.env.CI || process.env.CHROME_TEST_MODE === 'mock') {
 // Suppress known harmless unhandled promise rejections during tests (BSD compliance)
 // This ensures test output is clean and does not mask real errors. Only suppresses specific, expected errors.
 process.on('unhandledRejection', (reason) => {
-  const message = typeof reason === 'object' && reason !== null && 'message' in reason ? (reason as any).message : '';
+  const message = typeof reason === 'object' && reason !== null && 'message' in reason ? (reason as Error).message : '';
   if (
     typeof message === 'string' &&
     (
@@ -59,16 +63,42 @@ const createMockResponse = (ok: boolean, jsonData?: any): Response => ({
   trailer: Promise.resolve(new Headers())
 } as unknown as Response);
 
+// Fix line 39 any type
+interface MockCDPClient {
+  Network: {
+    enable: ReturnType<typeof vi.fn<[], Promise<void>>>;
+    disable: ReturnType<typeof vi.fn<[], Promise<void>>>;
+    requestWillBeSent: ReturnType<typeof vi.fn<[], void>>;
+    responseReceived: ReturnType<typeof vi.fn<[], void>>;
+  };
+  Console: {
+    enable: ReturnType<typeof vi.fn<[], Promise<void>>>;
+    disable: ReturnType<typeof vi.fn<[], Promise<void>>>;
+    messageAdded: ReturnType<typeof vi.fn<[], void>>;
+  };
+  Log: {
+    enable: ReturnType<typeof vi.fn<[], Promise<void>>>;
+    disable: ReturnType<typeof vi.fn<[], Promise<void>>>;
+    entryAdded: ReturnType<typeof vi.fn<[], void>>;
+  };
+  close: ReturnType<typeof vi.fn<[], Promise<void>>>;
+  on: ReturnType<typeof vi.fn<[event: string, callback: (data: unknown) => void], void>>;
+}
+
 // Test subclass to access protected _injectTestEvent
 class TestableChromeExtractor extends ChromeExtractor {
-  public injectTestEvent(type: 'network' | 'console' | 'log', payload: any, logsOverride?: any[]) {
+  public injectTestEvent(
+    type: 'network' | 'console' | 'log',
+    payload: NetworkRequest | NetworkResponse | ConsoleMessage | DevToolsLogEntry,
+    logsOverride?: ExtractedLog[]
+  ): void {
     return this._injectTestEvent(type, payload, logsOverride);
   }
 }
 
 describe('ChromeExtractor', () => {
   let extractor: TestableChromeExtractor;
-  let mockClient: any;
+  let mockClient: MockCDPClient;
 
   beforeEach(() => {
     // Reset all mocks before each test
@@ -86,7 +116,7 @@ describe('ChromeExtractor', () => {
     });
 
     // Set up the mock client that all tests will use
-    mockClient = {
+    const client = {
       Network: {
         enable: vi.fn().mockResolvedValue(undefined),
         disable: vi.fn().mockResolvedValue(undefined),
@@ -106,6 +136,7 @@ describe('ChromeExtractor', () => {
       close: vi.fn().mockResolvedValue(undefined),
       on: vi.fn()
     };
+    mockClient = client as unknown as MockCDPClient;
 
     // Set up default successful responses
     mockFetch
@@ -115,6 +146,7 @@ describe('ChromeExtractor', () => {
         webSocketDebuggerUrl: 'ws://localhost:9222/devtools/page/123'
       }]));
 
+    const mockCDP = vi.mocked(CDP);
     mockCDP.mockResolvedValue(mockClient);
   });
 
@@ -189,52 +221,56 @@ describe('ChromeExtractor', () => {
   describe('Log Collection', () => {
     it('should suppress DEPRECATED_ENDPOINT errors in console logs', async () => {
       // Simulate a DEPRECATED_ENDPOINT error event
-      const logs: any[] = [];
-      extractor.injectTestEvent('console', {
+      const logs: ExtractedLog[] = [];
+      const consoleMessage: ConsoleMessage = {
+        source: 'console',
         level: 'error',
         text: 'Registration response error message: DEPRECATED_ENDPOINT',
         timestamp: Date.now()
-      }, logs);
+      };
+      extractor.injectTestEvent('console', consoleMessage, logs);
       // Simulate log collection wait
       vi.advanceTimersByTime(15000);
       await vi.runAllTimersAsync();
-      // Should be suppressed, so logs should be empty
       expect(logs).toHaveLength(0);
-    }, 20000);
+    });
 
     it('should not suppress other errors in console logs', async () => {
-      const logs: any[] = [];
-      extractor.injectTestEvent('console', {
+      const logs: ExtractedLog[] = [];
+      const consoleMessage: ConsoleMessage = {
+        source: 'console',
         level: 'error',
         text: 'Some other error occurred',
         timestamp: Date.now()
-      }, logs);
+      };
+      extractor.injectTestEvent('console', consoleMessage, logs);
       vi.advanceTimersByTime(15000);
       await vi.runAllTimersAsync();
       expect(logs).toHaveLength(1);
-      expect(logs[0].details.text).toContain('Some other error occurred');
-    }, 20000);
+      expect(logs[0].details).toEqual(consoleMessage);
+    });
 
     it('should handle network errors during log collection', async () => {
-      const logs: any[] = [];
-      extractor.injectTestEvent('network', {
+      const logs: ExtractedLog[] = [];
+      const networkRequest: NetworkRequest = {
         requestId: '123',
-        url: 'http://example.com/api',
+        url: 'http://example.com',
         method: 'GET',
         headers: {},
         timestamp: Date.now()
-      }, logs);
+      };
+      extractor.injectTestEvent('network', networkRequest, logs);
       vi.advanceTimersByTime(15000);
       await vi.runAllTimersAsync();
       expect(logs).toHaveLength(1);
-      expect(logs[0].details.url).toContain('http://example.com/api');
-    }, 20000);
+      expect(logs[0].details).toEqual(networkRequest);
+    });
   });
 
   describe('Cleanup', () => {
     it('should properly clean up resources on success', async () => {
       // Mock successful connection
-      const mockClient = {
+      const mockClient: MockCDPClient = {
         Network: {
           enable: vi.fn(),
           disable: vi.fn(),
@@ -263,6 +299,7 @@ describe('ChromeExtractor', () => {
           webSocketDebuggerUrl: 'ws://localhost:9222/devtools/page/123'
         }]));
 
+      const mockCDP = vi.mocked(CDP);
       mockCDP.mockResolvedValue(mockClient);
 
       const promise = extractor.extract();
@@ -280,7 +317,7 @@ describe('ChromeExtractor', () => {
 
     it('should properly clean up resources on failure', async () => {
       // Mock successful connection but failed log collection
-      const mockClient = {
+      const mockClient: MockCDPClient = {
         Network: {
           enable: vi.fn().mockRejectedValue(new Error('Network enable failed')),
           disable: vi.fn(),
@@ -309,6 +346,7 @@ describe('ChromeExtractor', () => {
           webSocketDebuggerUrl: 'ws://localhost:9222/devtools/page/123'
         }]));
 
+      const mockCDP = vi.mocked(CDP);
       mockCDP.mockResolvedValue(mockClient);
 
       await expect(extractor.extract()).rejects.toThrow('Network enable failed');
