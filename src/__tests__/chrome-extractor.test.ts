@@ -114,24 +114,43 @@ describe('ChromeExtractor', () => {
           entryAdded: vi.fn()
         },
         close: vi.fn().mockResolvedValue(undefined),
-        on: vi.fn()
+        on: vi.fn((event, callback) => {
+          // Immediately trigger a log event to avoid waiting
+          if (event === 'Console.messageAdded') {
+            callback({
+              message: {
+                level: 'info',
+                text: 'Test log',
+                timestamp: Date.now()
+              }
+            });
+          }
+        })
       };
 
       mockCDP
         .mockRejectedValueOnce(new Error('Registration response error message: DEPRECATED_ENDPOINT'))
         .mockResolvedValueOnce(mockClient);
 
-      const promise = extractor.extract();
+      const extractPromise = extractor.extract();
       
       // Fast-forward through the retry delay
-      await vi.advanceTimersByTimeAsync(100);
-      await promise;
-
+      await vi.advanceTimersByTimeAsync(200);
+      
+      // Fast-forward through the log collection wait time (15 seconds)
+      for (let i = 0; i < 15; i++) {
+        await vi.advanceTimersByTimeAsync(1000);
+      }
+      
+      const result = await extractPromise;
+      
       expect(mockCDP).toHaveBeenCalledTimes(2);
       expect(mockClient.Network.enable).toHaveBeenCalled();
       expect(mockClient.Console.enable).toHaveBeenCalled();
       expect(mockClient.Log.enable).toHaveBeenCalled();
-    });
+      
+      return result;
+    }, 60000);
 
     it('should handle connection failures with retries', async () => {
       // Mock version check success
