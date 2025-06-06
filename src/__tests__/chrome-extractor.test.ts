@@ -3,6 +3,12 @@ import CDP from 'chrome-remote-interface';
 import fetch, { Response, Headers } from 'node-fetch';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
+// Ensure we're using mocks in CI environment
+if (process.env.CI || process.env.CHROME_TEST_MODE === 'mock') {
+  vi.mock('chrome-remote-interface');
+  vi.mock('node-fetch');
+}
+
 // Suppress known harmless unhandled promise rejections during tests (BSD compliance)
 // This ensures test output is clean and does not mask real errors. Only suppresses specific, expected errors.
 process.on('unhandledRejection', (reason) => {

@@ -28,5 +28,9 @@ export default defineConfig({
         'src/**/__tests__/**',
       ],
     },
+    env: {
+      CHROME_TEST_MODE: process.env.CI ? 'mock' : 'real',
+    },
+    retry: process.env.CI ? 2 : 0,
   },
 }); 

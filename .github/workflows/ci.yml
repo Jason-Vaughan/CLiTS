@@ -35,6 +35,11 @@ jobs:
         NODE_ENV: test
         # Ensure tests don't try to connect to real Chrome
         CHROME_TEST_MODE: mock
+        # Increase test timeouts for CI environment
+        VITEST_TEST_TIMEOUT: 30000
+        VITEST_HOOK_TIMEOUT: 30000
+        # Disable color output in tests for cleaner logs
+        NO_COLOR: 1
 
   publish:
     needs: test
