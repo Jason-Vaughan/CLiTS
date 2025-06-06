@@ -5,6 +5,8 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "logo": "assets/CLiTS Logo.png",
+  "homepage": "https://github.com/Jason-Vaughan/CLiTS#readme",
   "exports": {
     ".": {
       "import": "./dist/index.js",
