@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "ES2020",
     "module": "ES2020",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "outDir": "./dist",
@@ -10,8 +10,9 @@
     "strict": true,
     "declaration": true,
     "typeRoots": ["./node_modules/@types", "./src/types"],
-    "types": ["node"]
+    "types": ["node"],
+    "skipLibCheck": true
   },
   "include": ["src/**/*", "src/**/*.d.ts", "src/**/*.test.ts", "src/**/__tests__/**/*"],
-  "exclude": []
+  "exclude": ["node_modules"]
 } 
