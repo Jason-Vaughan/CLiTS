@@ -80,12 +80,12 @@
     "@types/node-fetch": "^2.6.12",
     "@typescript-eslint/eslint-plugin": "^7.1.0",
     "@typescript-eslint/parser": "^7.1.0",
-    "@vitest/coverage-c8": "^0.33.0",
-    "@vitest/ui": "^3.2.1",
+    "@vitest/coverage-v8": "^1.2.1",
+    "@vitest/ui": "^1.2.1",
     "eslint": "^8.57.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3",
-    "vitest": "^3.2.1"
+    "vitest": "^1.2.1"
   },
   "dependencies": {
     "chalk": "^5.4.1",
