@@ -33,7 +33,6 @@ const mockFetch = fetch as ReturnType<typeof vi.mocked<typeof fetch>>;
 const createMockResponse = (ok: boolean, jsonData?: any): Response => ({
   ok,
   json: () => Promise.resolve(jsonData),
-  // Add other required Response properties
   status: ok ? 200 : 400,
   statusText: ok ? 'OK' : 'Bad Request',
   headers: new Headers(),
@@ -63,8 +62,14 @@ class TestableChromeExtractor extends ChromeExtractor {
 
 describe('ChromeExtractor', () => {
   let extractor: TestableChromeExtractor;
+  let mockClient: any;
 
   beforeEach(() => {
+    // Reset all mocks before each test
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+
+    // Create a new extractor instance with test configuration
     extractor = new TestableChromeExtractor({
       retryConfig: {
         maxRetries: 3,
@@ -74,9 +79,37 @@ describe('ChromeExtractor', () => {
       }
     });
 
-    // Reset all mocks
-    vi.clearAllMocks();
-    vi.useFakeTimers();
+    // Set up the mock client that all tests will use
+    mockClient = {
+      Network: {
+        enable: vi.fn().mockResolvedValue(undefined),
+        disable: vi.fn().mockResolvedValue(undefined),
+        requestWillBeSent: vi.fn(),
+        responseReceived: vi.fn()
+      },
+      Console: {
+        enable: vi.fn().mockResolvedValue(undefined),
+        disable: vi.fn().mockResolvedValue(undefined),
+        messageAdded: vi.fn()
+      },
+      Log: {
+        enable: vi.fn().mockResolvedValue(undefined),
+        disable: vi.fn().mockResolvedValue(undefined),
+        entryAdded: vi.fn()
+      },
+      close: vi.fn().mockResolvedValue(undefined),
+      on: vi.fn()
+    };
+
+    // Set up default successful responses
+    mockFetch
+      .mockResolvedValue(createMockResponse(true, [{
+        type: 'page',
+        url: 'http://example.com',
+        webSocketDebuggerUrl: 'ws://localhost:9222/devtools/page/123'
+      }]));
+
+    mockCDP.mockResolvedValue(mockClient);
   });
 
   afterEach(async () => {
@@ -86,61 +119,31 @@ describe('ChromeExtractor', () => {
 
   describe('Connection and Registration', () => {
     it('should handle DEPRECATED_ENDPOINT with retries', async () => {
-      // Mock version check
-      mockFetch
-        .mockResolvedValueOnce(createMockResponse(true))
-        .mockResolvedValueOnce(createMockResponse(true, [{
-          type: 'page',
-          url: 'http://example.com',
-          webSocketDebuggerUrl: 'ws://localhost:9222/devtools/page/123'
-        }]));
-
-      // Mock CDP connection with DEPRECATED_ENDPOINT error then success
-      const mockClient = {
-        Network: {
-          enable: vi.fn().mockResolvedValue(undefined),
-          disable: vi.fn().mockResolvedValue(undefined),
-          requestWillBeSent: vi.fn(),
-          responseReceived: vi.fn()
-        },
-        Console: {
-          enable: vi.fn().mockResolvedValue(undefined),
-          disable: vi.fn().mockResolvedValue(undefined),
-          messageAdded: vi.fn()
-        },
-        Log: {
-          enable: vi.fn().mockResolvedValue(undefined),
-          disable: vi.fn().mockResolvedValue(undefined),
-          entryAdded: vi.fn()
-        },
-        close: vi.fn().mockResolvedValue(undefined),
-        on: vi.fn((event, callback) => {
-          // Immediately trigger a log event to avoid waiting
-          if (event === 'Console.messageAdded') {
-            callback({
-              message: {
-                level: 'info',
-                text: 'Test log',
-                timestamp: Date.now()
-              }
-            });
-          }
-        })
-      };
-
+      // Override the default mock for this specific test
       mockCDP
         .mockRejectedValueOnce(new Error('Registration response error message: DEPRECATED_ENDPOINT'))
         .mockResolvedValueOnce(mockClient);
+
+      // Set up the mock client to emit a log event immediately
+      mockClient.on.mockImplementation((event, callback) => {
+        if (event === 'Console.messageAdded') {
+          callback({
+            message: {
+              level: 'info',
+              text: 'Test log',
+              timestamp: Date.now()
+            }
+          });
+        }
+      });
 
       const extractPromise = extractor.extract();
       
       // Fast-forward through the retry delay
       await vi.advanceTimersByTimeAsync(200);
       
-      // Fast-forward through the log collection wait time (15 seconds)
-      for (let i = 0; i < 15; i++) {
-        await vi.advanceTimersByTimeAsync(1000);
-      }
+      // Fast-forward through the log collection wait time
+      await vi.advanceTimersByTimeAsync(15000);
       
       const result = await extractPromise;
       
@@ -150,21 +153,11 @@ describe('ChromeExtractor', () => {
       expect(mockClient.Log.enable).toHaveBeenCalled();
       
       return result;
-    }, 60000);
+    });
 
     it('should handle connection failures with retries', async () => {
-      // Mock version check success
-      mockFetch
-        .mockResolvedValueOnce(createMockResponse(true))
-        .mockResolvedValueOnce(createMockResponse(true, [{
-          type: 'page',
-          url: 'http://example.com',
-          webSocketDebuggerUrl: 'ws://localhost:9222/devtools/page/123'
-        }]));
-
-      // Mock CDP connection failures
-      mockCDP
-        .mockRejectedValue(new Error('Failed to connect to Chrome debugging endpoint'));
+      // Override the default mock for this specific test
+      mockCDP.mockRejectedValue(new Error('Failed to connect to Chrome debugging endpoint'));
 
       const promise = extractor.extract();
 
@@ -178,7 +171,7 @@ describe('ChromeExtractor', () => {
     });
 
     it('should not retry on non-recoverable errors', async () => {
-      // Mock version check failure
+      // Override the default mock for this specific test
       mockFetch.mockResolvedValueOnce(createMockResponse(false));
 
       await expect(extractor.extract()).rejects.toThrow('Chrome is not running');
@@ -188,42 +181,6 @@ describe('ChromeExtractor', () => {
   });
 
   describe('Log Collection', () => {
-    let mockClient: any;
-
-    beforeEach(() => {
-      // Mock successful connection setup
-      mockFetch
-        .mockResolvedValueOnce(createMockResponse(true))
-        .mockResolvedValueOnce(createMockResponse(true, [{
-          type: 'page',
-          url: 'http://example.com',
-          webSocketDebuggerUrl: 'ws://localhost:9222/devtools/page/123'
-        }]));
-
-      mockClient = {
-        Network: {
-          enable: vi.fn(),
-          disable: vi.fn(),
-          requestWillBeSent: vi.fn(),
-          responseReceived: vi.fn()
-        },
-        Console: {
-          enable: vi.fn(),
-          disable: vi.fn(),
-          messageAdded: vi.fn()
-        },
-        Log: {
-          enable: vi.fn(),
-          disable: vi.fn(),
-          entryAdded: vi.fn()
-        },
-        close: vi.fn(),
-        on: vi.fn()
-      };
-
-      mockCDP.mockResolvedValue(mockClient);
-    });
-
     it('should suppress DEPRECATED_ENDPOINT errors in console logs', async () => {
       // Simulate a DEPRECATED_ENDPOINT error event
       const logs: any[] = [];

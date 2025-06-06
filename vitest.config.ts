@@ -13,8 +13,8 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     setupFiles: [],
-    testTimeout: 60000,
-    hookTimeout: 60000,
+    testTimeout: process.env.CI ? 30000 : 60000,
+    hookTimeout: process.env.CI ? 30000 : 60000,
     pool: 'forks',
     poolOptions: {
       forks: {
