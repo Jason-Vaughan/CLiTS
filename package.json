@@ -71,7 +71,7 @@
     "url": "https://github.com/jasonvaughan/clits/issues"
   },
   "engines": {
-    "node": ">=16"
+    "node": ">=20"
   },
   "devDependencies": {
     "@playwright/test": "^1.52.0",
