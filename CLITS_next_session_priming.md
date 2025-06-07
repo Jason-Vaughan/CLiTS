@@ -84,6 +84,22 @@ Implementing improvements based on OnDeck's feedback, organized into phases, whi
 - Next steps: Continue debugging and fixing the failing tests, focusing on the exact content and type of `ExtractedLog` and `CollectedLogEntry` objects, and ensuring the `formatLogs` method correctly processes and populates the `content` property for all new log types. Verify that `ChromeErrorHandler.executeWithRetry` is not inadvertently suppressing or modifying errors that should cause test failures.
 - Blockers: Failing tests preventing NPM publish.
 
+## Next Session Focus
+- Main Task: Fix remaining linter errors in `src/__tests__/chrome-extractor.test.ts`
+- Current Progress: Identified two main issues:
+  1. ConsoleMessage type requires proper `source` property definition
+  2. Unused imports (PlatformErrorHandler and ChromeErrorHandler) need to be addressed
+- Starting Point: Continue from the current state of `src/__tests__/chrome-extractor.test.ts` with focus on type definitions and import cleanup
+
+## Current Progress
+- [x] Identified specific linter errors in test file
+- [x] Attempted initial fixes for type definitions
+- [ ] Fix ConsoleMessage type definition
+- [ ] Clean up unused imports
+- [ ] Verify all test cases are properly typed
+- [ ] Ensure test file passes all linter checks
+- [ ] Complete NPM package publication process
+
 ## Compute Requirements
 - Recommended: High
 - Reasoning: 
