@@ -140,6 +140,13 @@ type CredentialDetails = {
   key?: string; // e.g., 'Authorization', 'x-api-key'
 };
 
+type ReactHookEvent = {
+  level: string;
+  text: string;
+  parameters?: Array<{ type: string; value: any }>;
+  timestamp: string; // Changed to string to match toISOString usage
+};
+
 // Add type declaration for CDP client with event handling
 interface CDPClient extends EventEmitter {
   Network: any;
@@ -212,7 +219,7 @@ export interface CollectedLogEntry {
   timestamp: string;
   content?: string;
   level?: string;
-  details: NetworkRequest | NetworkResponse | ConsoleMessage | DevToolsLogEntry | CorrelatedNetworkEntry | WebSocketEvent | JwtTokenDetails | GraphQLEvent | ReduxEvent | PerformanceMetricEvent | EventLoopMetricEvent | UserInteractionEvent | DomMutationEvent | CssChangeEvent | CredentialDetails;
+  details: NetworkRequest | NetworkResponse | ConsoleMessage | DevToolsLogEntry | CorrelatedNetworkEntry | WebSocketEvent | JwtTokenDetails | GraphQLEvent | ReduxEvent | PerformanceMetricEvent | EventLoopMetricEvent | UserInteractionEvent | DomMutationEvent | CssChangeEvent | CredentialDetails | ReactHookEvent;
 }
 
 export class ChromeExtractor {
@@ -225,6 +232,7 @@ export class ChromeExtractor {
   private dataSanitizer: DataSanitizer;
   private pendingNetworkRequests: Map<string, NetworkRequest> = new Map(); // Added for correlation
   private pendingGraphqlRequests: Map<string, NetworkRequest> = new Map(); // Added for GraphQL correlation
+  protected collectedLogs: CollectedLogEntry[] = []; // Initialize collectedLogs array
 
   constructor(options: ChromeExtractorOptions = {}) {
     this.options = {
@@ -655,6 +663,12 @@ export class ChromeExtractor {
           } else if (log.type === 'credential') {
             const credentialDetails = log.details as CredentialDetails;
             entry += `Credential Detected: Type=${credentialDetails.type}, Source=${credentialDetails.source}, Key=${credentialDetails.key || 'N/A'}`;
+          } else if (log.type === 'reacthook') {
+            const reactHookEvent = log.details as ReactHookEvent;
+            entry += reactHookEvent.text;
+            if (reactHookEvent.parameters && reactHookEvent.parameters.length > 0) {
+              entry += ` (Parameters: ${JSON.stringify(reactHookEvent.parameters)})`;
+            }
           } else {
             const msg = log.details as ConsoleMessage | DevToolsLogEntry;
             entry += msg.text;
@@ -708,6 +722,12 @@ export class ChromeExtractor {
         content = JSON.stringify(log.details, null, 2);
       } else if (log.type === 'credential') {
         content = JSON.stringify(log.details, null, 2);
+      } else if (log.type === 'reacthook') {
+        const reactHookEvent = log.details as ReactHookEvent;
+        content = reactHookEvent.text;
+        if (reactHookEvent.parameters && reactHookEvent.parameters.length > 0) {
+          content += ` (Parameters: ${JSON.stringify(reactHookEvent.parameters)})`;
+        }
       } else {
         content = JSON.stringify(log.details, null, 2);
       }
@@ -772,6 +792,10 @@ export class ChromeExtractor {
     let userInteractionRecordingEnabled = false;
     let domMutationMonitoringEnabled = false;
     let cssChangeMonitoringEnabled = false;
+
+    // Reset logs array at the start of extraction
+    this.collectedLogs = [];
+
     try {
       logger.info('Connecting to Chrome DevTools...', { options: this.options });
       
@@ -806,7 +830,6 @@ export class ChromeExtractor {
       logger.info('Connected to Chrome');
 
       const { Network, Console, Log, Runtime, CSS, Performance } = client;
-      const logs: CollectedLogEntry[] = [];
 
       // Helper function to convert Chrome timestamp to ISO string
       const toISOString = (timestamp: number) => {
@@ -948,9 +971,7 @@ export class ChromeExtractor {
           logger.info('Network tracking enabled');
         } catch (error) {
           logger.error('Failed to enable Network domain', { error });
-          // Decide on recovery action: e.g., continue without network logs, or re-throw if critical
-          // For now, we will log and continue without network logs
-          this.options.includeNetwork = false; // Disable network tracking for this session
+          throw error; // Re-throw error to ensure promise rejection
         }
       }
       if (this.options.includeConsole) {
@@ -961,9 +982,7 @@ export class ChromeExtractor {
           logger.info('Console tracking enabled');
         } catch (error) {
           logger.error('Failed to enable Console/Log domain', { error });
-          // Decide on recovery action: e.g., continue without console logs, or re-throw if critical
-          // For now, we will log and continue without console logs
-          this.options.includeConsole = false; // Disable console tracking for this session
+          throw error; // Re-throw error to ensure promise rejection
         }
       }
       if (this.options.includeWebSockets) {
@@ -973,7 +992,7 @@ export class ChromeExtractor {
           logger.info('WebSocket tracking enabled');
         } catch (error) {
           logger.error('Failed to enable Network domain for WebSocket tracking', { error });
-          this.options.includeWebSockets = false;
+          throw error; // Re-throw error to ensure promise rejection
         }
       }
       if (this.options.includeJwtMonitoring) {
@@ -983,7 +1002,7 @@ export class ChromeExtractor {
           logger.info('JWT token monitoring enabled');
         } catch (error) {
           logger.error('Failed to enable Network domain for JWT monitoring', { error });
-          this.options.includeJwtMonitoring = false;
+          throw error; // Re-throw error to ensure promise rejection
         }
       }
       if (this.options.includeGraphqlMonitoring) {
@@ -993,7 +1012,7 @@ export class ChromeExtractor {
           logger.info('GraphQL monitoring enabled');
         } catch (error) {
           logger.error('Failed to enable Network domain for GraphQL monitoring', { error });
-          this.options.includeGraphqlMonitoring = false;
+          throw error; // Re-throw error to ensure promise rejection
         }
       }
       if (this.options.includeReduxMonitoring) {
@@ -1004,7 +1023,7 @@ export class ChromeExtractor {
           logger.info('Redux state monitoring script injected.');
         } catch (error) {
           logger.error('Failed to inject Redux state monitoring script', { error });
-          this.options.includeReduxMonitoring = false;
+          throw error; // Re-throw error to ensure promise rejection
         }
       }
       if (this.options.includePerformanceMonitoring) {
@@ -1014,7 +1033,7 @@ export class ChromeExtractor {
           logger.info('Performance monitoring enabled');
         } catch (error) {
           logger.error('Failed to enable Performance domain', { error });
-          this.options.includePerformanceMonitoring = false;
+          throw error; // Re-throw error to ensure promise rejection
         }
       }
       if (this.options.includeEventLoopMonitoring) {
@@ -1025,7 +1044,7 @@ export class ChromeExtractor {
           logger.info('Event loop monitoring script injected.');
         } catch (error) {
           logger.error('Failed to inject Event loop monitoring script', { error });
-          this.options.includeEventLoopMonitoring = false;
+          throw error; // Re-throw error to ensure promise rejection
         }
       }
       if (this.options.includeUserInteractionRecording) {
@@ -1036,7 +1055,7 @@ export class ChromeExtractor {
           logger.info('User interaction recording script injected.');
         } catch (error) {
           logger.error('Failed to inject User interaction recording script', { error });
-          this.options.includeUserInteractionRecording = false;
+          throw error; // Re-throw error to ensure promise rejection
         }
       }
       if (this.options.includeDomMutationMonitoring) {
@@ -1047,7 +1066,7 @@ export class ChromeExtractor {
           logger.info('DOM mutation monitoring script injected.');
         } catch (error) {
           logger.error('Failed to inject DOM mutation monitoring script', { error });
-          this.options.includeDomMutationMonitoring = false;
+          throw error; // Re-throw error to ensure promise rejection
         }
       }
       if (this.options.includeCssChangeMonitoring) {
@@ -1057,7 +1076,7 @@ export class ChromeExtractor {
           logger.info('CSS change monitoring enabled.');
         } catch (error) {
           logger.error('Failed to enable CSS change monitoring', { error });
-          this.options.includeCssChangeMonitoring = false;
+          throw error; // Re-throw error to ensure promise rejection
         }
       }
 
@@ -1076,14 +1095,14 @@ export class ChromeExtractor {
                 if (authHeader.startsWith('Bearer ')) {
                   const token = authHeader.substring(7);
                   const jwtDetails = this.parseJwt(token);
-                  logs.push({
+                  this.collectedLogs.push({
                     type: 'jwt',
                     timestamp: toISOString(params.timestamp),
                     details: jwtDetails
                   });
                   logger.info('JWT token found in request', { token: jwtDetails.token });
                 } else if (authHeader.startsWith('Basic ')) {
-                  logs.push({
+                  this.collectedLogs.push({
                     type: 'credential',
                     timestamp: toISOString(params.timestamp),
                     details: { type: 'basicAuth', value: authHeader, source: 'header', key: headerName }
@@ -1091,7 +1110,7 @@ export class ChromeExtractor {
                   logger.info('Basic Auth credentials found in request header');
                 }
               } else if (headerName.toLowerCase().includes('key') || headerName.toLowerCase().includes('token')) {
-                logs.push({
+                this.collectedLogs.push({
                   type: 'credential',
                   timestamp: toISOString(params.timestamp),
                   details: { type: 'apiKey', value: params.request.headers[headerName], source: 'header', key: headerName }
@@ -1117,7 +1136,7 @@ export class ChromeExtractor {
                   timestamp: params.timestamp,
                   type: 'request'
                 };
-                logs.push({
+                this.collectedLogs.push({
                   type: 'graphql',
                   timestamp: toISOString(params.timestamp),
                   details: graphqlEvent
@@ -1140,7 +1159,7 @@ export class ChromeExtractor {
               request: request,
               response: params.response,
             };
-            logs.push({
+            this.collectedLogs.push({
               type: 'network',
               timestamp: toISOString(params.timestamp),
               details: correlatedEntry
@@ -1150,7 +1169,7 @@ export class ChromeExtractor {
           } else {
             // If no matching request, log the response as is (e.g., from cache or already processed)
             logger.warn('Received network response for unknown request', { requestId: params.requestId });
-            logs.push({
+            this.collectedLogs.push({
               type: 'network',
               timestamp: toISOString(params.timestamp),
               details: params.response // Still push the raw response if unmatched
@@ -1167,14 +1186,14 @@ export class ChromeExtractor {
                 if (authHeader.startsWith('Bearer ')) {
                   const token = authHeader.substring(7);
                   const jwtDetails = this.parseJwt(token);
-                  logs.push({
+                  this.collectedLogs.push({
                     type: 'jwt',
                     timestamp: toISOString(params.timestamp),
                     details: jwtDetails
                   });
                   logger.info('JWT token found in response', { token: jwtDetails.token });
                 } else if (authHeader.startsWith('Basic ')) {
-                  logs.push({
+                  this.collectedLogs.push({
                     type: 'credential',
                     timestamp: toISOString(params.timestamp),
                     details: { type: 'basicAuth', value: authHeader, source: 'header', key: headerName }
@@ -1182,7 +1201,7 @@ export class ChromeExtractor {
                   logger.info('Basic Auth credentials found in response header');
                 }
               } else if (headerName.toLowerCase().includes('key') || headerName.toLowerCase().includes('token')) {
-                logs.push({
+                this.collectedLogs.push({
                   type: 'credential',
                   timestamp: toISOString(params.timestamp),
                   details: { type: 'apiKey', value: params.response.headers[headerName], source: 'header', key: headerName }
@@ -1214,7 +1233,7 @@ export class ChromeExtractor {
                 timestamp: params.timestamp,
                 type: 'response'
               };
-              logs.push({
+              this.collectedLogs.push({
                 type: 'graphql',
                 timestamp: toISOString(params.timestamp),
                 details: graphqlEvent
@@ -1247,7 +1266,7 @@ export class ChromeExtractor {
           }
 
           logger.debug('Console message detected', { level: params.level, text: params.text, details: params });
-          logs.push({
+          this.collectedLogs.push({
             type: 'console',
             timestamp: toISOString(params.timestamp),
             details: params
@@ -1274,7 +1293,7 @@ export class ChromeExtractor {
           }
 
           logger.debug('Log entry detected', { level: params.level, text: params.text, details: params });
-          logs.push({
+          this.collectedLogs.push({
             type: 'log',
             timestamp: toISOString(params.timestamp),
             details: params
@@ -1285,7 +1304,7 @@ export class ChromeExtractor {
       if (this.options.includeWebSockets) {
         Network.webSocketCreated((params: any) => {
           logger.debug('WebSocket created', { url: params.url, requestId: params.requestId });
-          logs.push({
+          this.collectedLogs.push({
             type: 'websocket',
             timestamp: toISOString(params.timestamp),
             details: { type: 'webSocketCreated', requestId: params.requestId, url: params.url, message: 'WebSocket created', timestamp: params.timestamp }
@@ -1294,7 +1313,7 @@ export class ChromeExtractor {
 
         Network.webSocketClosed((params: any) => {
           logger.debug('WebSocket closed', { requestId: params.requestId });
-          logs.push({
+          this.collectedLogs.push({
             type: 'websocket',
             timestamp: toISOString(params.timestamp),
             details: { type: 'webSocketClosed', requestId: params.requestId, url: params.url, message: 'WebSocket closed', timestamp: params.timestamp }
@@ -1303,7 +1322,7 @@ export class ChromeExtractor {
 
         Network.webSocketFrameSent((params: any) => {
           logger.debug('WebSocket frame sent', { requestId: params.requestId, payloadData: params.response.payloadData });
-          logs.push({
+          this.collectedLogs.push({
             type: 'websocket',
             timestamp: toISOString(params.timestamp),
             details: { type: 'webSocketFrameSent', requestId: params.requestId, url: params.url, frame: params.response, timestamp: params.timestamp }
@@ -1312,7 +1331,7 @@ export class ChromeExtractor {
 
         Network.webSocketFrameReceived((params: any) => {
           logger.debug('WebSocket frame received', { requestId: params.requestId, payloadData: params.response.payloadData });
-          logs.push({
+          this.collectedLogs.push({
             type: 'websocket',
             timestamp: toISOString(params.timestamp),
             details: { type: 'webSocketFrameReceived', requestId: params.requestId, url: params.url, frame: params.response, timestamp: params.timestamp }
@@ -1348,7 +1367,7 @@ export class ChromeExtractor {
               metric.name === 'V8.Memory.AllocatedBytes' ||
               metric.name === 'V8.Memory.TotalHeapSize'
             ) {
-              logs.push({
+              this.collectedLogs.push({
                 type: 'performance',
                 timestamp: toISOString(params.title ? params.timestamp : Date.now() / 1000), // Use event timestamp or current time
                 details: {
@@ -1364,7 +1383,7 @@ export class ChromeExtractor {
             // Additionally, look for User Timing API marks and measures if React uses them
             // React DevTools often reports these as 'Mark:<name>' or 'Measure:<name>'
             if (metric.name.startsWith('Mark:') || metric.name.startsWith('Measure:')) {
-                logs.push({
+                this.collectedLogs.push({
                   type: 'performance',
                   timestamp: toISOString(params.title ? params.timestamp : Date.now() / 1000),
                   details: {
@@ -1383,7 +1402,7 @@ export class ChromeExtractor {
       if (this.options.includeCssChangeMonitoring) {
         client.CSS.stylesheetAdded((params: any) => {
           logger.debug('Stylesheet added', { header: params.header });
-          logs.push({
+          this.collectedLogs.push({
             type: 'csschange',
             timestamp: toISOString(Date.now() / 1000), // CDP event doesn't have a timestamp
             details: { type: 'stylesheetAdded', styleSheetId: params.header.styleSheetId, header: params.header, timestamp: Date.now() }
@@ -1392,7 +1411,7 @@ export class ChromeExtractor {
 
         client.CSS.stylesheetRemoved((params: any) => {
           logger.debug('Stylesheet removed', { styleSheetId: params.styleSheetId });
-          logs.push({
+          this.collectedLogs.push({
             type: 'csschange',
             timestamp: toISOString(Date.now() / 1000),
             details: { type: 'stylesheetRemoved', styleSheetId: params.styleSheetId, timestamp: Date.now() }
@@ -1401,7 +1420,7 @@ export class ChromeExtractor {
 
         client.CSS.stylesheetChanged((params: any) => {
           logger.debug('Stylesheet changed', { styleSheetId: params.styleSheetId });
-          logs.push({
+          this.collectedLogs.push({
             type: 'csschange',
             timestamp: toISOString(Date.now() / 1000),
             details: { type: 'stylesheetChanged', styleSheetId: params.styleSheetId, change: params, timestamp: Date.now() }
@@ -1418,7 +1437,7 @@ export class ChromeExtractor {
       await new Promise<void>((resolve) => {
         const interval = setInterval(() => {
           elapsed += progressInterval;
-          logger.info(`Collecting logs... ${elapsed/1000}s elapsed, ${logs.length} logs collected`);
+          logger.info(`Collecting logs... ${elapsed/1000}s elapsed, ${this.collectedLogs.length} logs collected`);
           
           if (elapsed >= waitTimeMs) {
             clearInterval(interval);
@@ -1427,10 +1446,10 @@ export class ChromeExtractor {
         }, progressInterval);
       });
 
-      logger.info(`Collection complete. ${logs.length} logs collected`);
+      logger.info(`Collection complete. ${this.collectedLogs.length} logs collected`);
 
       // Clean up (handled in finally)
-      const formattedLogs = this.formatLogs(logs);
+      const formattedLogs = this.formatLogs(this.collectedLogs);
       logger.info(`Formatted ${formattedLogs.length} logs after filtering`);
       
       return formattedLogs;
@@ -1548,10 +1567,13 @@ export class ChromeExtractor {
     payload: any,
     logsOverride?: CollectedLogEntry[]
   ) {
-    const logs = logsOverride || (this as any).collectedLogs; // Use collectedLogs if no override
-    const toISOString = (timestamp: number) => {
-      return new Date(timestamp).toISOString();
-    };
+    const logs = logsOverride || this.collectedLogs;
+    
+    // Ensure timestamp is in ISO string format
+    const timestamp = typeof payload.timestamp === 'number' 
+      ? new Date(payload.timestamp).toISOString()
+      : payload.timestamp || new Date().toISOString();
+
     if (type === 'console') {
       // Suppression logic for console
       if (payload && typeof payload.text === 'string') {
@@ -1570,7 +1592,7 @@ export class ChromeExtractor {
       }
       logs.push({
         type,
-        timestamp: toISOString(payload.timestamp),
+        timestamp,
         details: payload
       });
     } else if (type === 'log') {
@@ -1591,84 +1613,16 @@ export class ChromeExtractor {
       }
       logs.push({
         type,
-        timestamp: toISOString(payload.timestamp),
+        timestamp,
         details: payload
       });
-    } else if (type === 'network') {
+    } else {
+      // For all other types, just push the log entry
       logs.push({
         type,
-        timestamp: toISOString(payload.timestamp),
+        timestamp,
         details: payload
       });
-    } else if (type === 'reacthook') {
-      logs.push({
-        type: 'reacthook',
-        timestamp: toISOString(payload.timestamp),
-        details: payload
-      });
-    } else if (type === 'dommutation') {
-      logs.push({
-        type: 'dommutation',
-        timestamp: toISOString(payload.timestamp),
-        details: payload
-      });
-    } else if (type === 'csschange') {
-      logs.push({
-        type: 'csschange',
-        timestamp: toISOString(payload.timestamp),
-        details: payload
-      });
-    } else if (type === 'redux') {
-      logs.push({
-        type: 'redux',
-        timestamp: toISOString(payload.timestamp),
-        details: payload
-      });
-    } else if (type === 'eventloop') {
-      logs.push({
-        type: 'eventloop',
-        timestamp: toISOString(payload.timestamp),
-        details: payload
-      });
-    } else if (type === 'userinteraction') {
-      logs.push({
-        type: 'userinteraction',
-        timestamp: toISOString(payload.timestamp),
-        details: payload
-      });
-    } else if (type === 'websocket') {
-      logs.push({
-        type: 'websocket',
-        timestamp: toISOString(payload.timestamp),
-        details: payload
-      });
-    } else if (type === 'jwt') {
-      logs.push({
-        type: 'jwt',
-        timestamp: toISOString(payload.timestamp),
-        details: payload
-      });
-    } else if (type === 'graphql') {
-      logs.push({
-        type: 'graphql',
-        timestamp: toISOString(payload.timestamp),
-        details: payload
-      });
-    } else if (type === 'performance') {
-      logs.push({
-        type: 'performance',
-        timestamp: toISOString(payload.timestamp),
-        details: payload
-      });
-    } else if (type === 'credential') {
-      logs.push({
-        type: 'credential',
-        timestamp: toISOString(payload.timestamp),
-        details: payload
-      });
-    }
-    if (!logsOverride && (this as any)._testLogsArray !== logs) {
-      (this as any)._testLogsArray = logs;
     }
   }
 } 

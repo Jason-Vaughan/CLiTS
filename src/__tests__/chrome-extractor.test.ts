@@ -1,11 +1,8 @@
 import { ChromeExtractor } from '../chrome-extractor.js';
 import CDP from 'chrome-remote-interface';
 import fetch, { Response, Headers } from 'node-fetch';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
 import type { ConsoleMessage, DevToolsLogEntry, NetworkRequest, NetworkResponse } from '../types/chrome-types.js';
-import type { ExtractedLog } from '../types/extractor.js';
-import { PlatformErrorHandler } from '../platform/error-handler.js';
-import { ChromeErrorHandler } from '../platform/chrome-error-handler.js';
 import { CollectedLogEntry } from '../chrome-extractor.js';
 
 // Ensure we're using mocks in CI environment
@@ -64,43 +61,57 @@ const createMockResponse = (ok: boolean, jsonData?: any): Response => ({
   trailer: Promise.resolve(new Headers())
 } as unknown as Response);
 
-// Fix line 39 any type
+// Define the callback function types
+type NetworkCallback = (event: NetworkRequestEvent | NetworkResponseEvent) => void;
+type ConsoleCallback = (event: { message: ConsoleMessage }) => void;
+type LogCallback = (event: { entry: DevToolsLogEntry }) => void;
+
+// Define the types for the CDP client events
+interface NetworkRequestEvent {
+  request: NetworkRequest;
+}
+
+interface NetworkResponseEvent {
+  response: NetworkResponse;
+}
+
+// Define the types for the CDP client methods
 interface MockCDPClient {
   Network: {
-    enable: ReturnType<typeof vi.fn<[], Promise<void>>>;
-    disable: ReturnType<typeof vi.fn<[], Promise<void>>>;
-    requestWillBeSent: ReturnType<typeof vi.fn<[], void>>;
-    responseReceived: ReturnType<typeof vi.fn<[], void>>;
+    enable: Mock<[], Promise<void>>;
+    disable: Mock<[], Promise<void>>;
+    requestWillBeSent: Mock<[NetworkRequestEvent], void>;
+    responseReceived: Mock<[NetworkResponseEvent], void>;
   };
   Console: {
-    enable: ReturnType<typeof vi.fn<[], Promise<void>>>;
-    disable: ReturnType<typeof vi.fn<[], Promise<void>>>;
-    messageAdded: ReturnType<typeof vi.fn<[], void>>;
+    enable: Mock<[], Promise<void>>;
+    disable: Mock<[], Promise<void>>;
+    messageAdded: Mock<[{ message: ConsoleMessage }], void>;
   };
   Log: {
-    enable: ReturnType<typeof vi.fn<[], Promise<void>>>;
-    disable: ReturnType<typeof vi.fn<[], Promise<void>>>;
-    entryAdded: ReturnType<typeof vi.fn<[], void>>;
+    enable: Mock<[], Promise<void>>;
+    disable: Mock<[], Promise<void>>;
+    entryAdded: Mock<[{ entry: DevToolsLogEntry }], void>;
   };
   Runtime: {
-    enable: ReturnType<typeof vi.fn<[], Promise<void>>>;
-    disable: ReturnType<typeof vi.fn<[], Promise<void>>>;
-    evaluate: ReturnType<typeof vi.fn<[], Promise<any>>>;
+    enable: Mock<[], Promise<void>>;
+    disable: Mock<[], Promise<void>>;
+    evaluate: Mock<[any], Promise<any>>;
   };
   Performance: {
-    enable: ReturnType<typeof vi.fn<[], Promise<void>>>;
-    disable: ReturnType<typeof vi.fn<[], Promise<void>>>;
-    metrics: ReturnType<typeof vi.fn<[], void>>;
+    enable: Mock<[], Promise<void>>;
+    disable: Mock<[], Promise<void>>;
+    metrics: Mock<[any], void>;
   };
   CSS: {
-    enable: ReturnType<typeof vi.fn<[], Promise<void>>>;
-    disable: ReturnType<typeof vi.fn<[], Promise<void>>>;
-    stylesheetAdded: ReturnType<typeof vi.fn<[], void>>;
-    stylesheetRemoved: ReturnType<typeof vi.fn<[], void>>;
-    stylesheetChanged: ReturnType<typeof vi.fn<[], void>>;
+    enable: Mock<[], Promise<void>>;
+    disable: Mock<[], Promise<void>>;
+    stylesheetAdded: Mock<[any], void>;
+    stylesheetRemoved: Mock<[any], void>;
+    stylesheetChanged: Mock<[any], void>;
   };
-  close: ReturnType<typeof vi.fn<[], Promise<void>>>;
-  on: ReturnType<typeof vi.fn<[event: string, callback: (data: unknown) => void], void>>;
+  close: Mock<[], Promise<void>>;
+  on: Mock<[string, NetworkCallback | ConsoleCallback | LogCallback], void>;
 }
 
 // Test subclass to access protected _injectTestEvent
@@ -134,22 +145,22 @@ describe('ChromeExtractor', () => {
     });
 
     // Set up the mock client that all tests will use
-    const client = {
+    mockClient = {
       Network: {
         enable: vi.fn().mockResolvedValue(undefined),
         disable: vi.fn().mockResolvedValue(undefined),
-        requestWillBeSent: vi.fn(),
-        responseReceived: vi.fn()
+        requestWillBeSent: vi.fn<[NetworkRequestEvent], void>(),
+        responseReceived: vi.fn<[NetworkResponseEvent], void>()
       },
       Console: {
         enable: vi.fn().mockResolvedValue(undefined),
         disable: vi.fn().mockResolvedValue(undefined),
-        messageAdded: vi.fn()
+        messageAdded: vi.fn<[{ message: ConsoleMessage }], void>()
       },
       Log: {
         enable: vi.fn().mockResolvedValue(undefined),
         disable: vi.fn().mockResolvedValue(undefined),
-        entryAdded: vi.fn()
+        entryAdded: vi.fn<[{ entry: DevToolsLogEntry }], void>()
       },
       Runtime: {
         enable: vi.fn().mockResolvedValue(undefined),
@@ -169,9 +180,19 @@ describe('ChromeExtractor', () => {
         stylesheetChanged: vi.fn()
       },
       close: vi.fn().mockResolvedValue(undefined),
-      on: vi.fn()
-    };
-    mockClient = client as unknown as MockCDPClient;
+      on: vi.fn().mockImplementation((event: string, callback: any) => {
+        // Store the callback for later use
+        if (event === 'Network.requestWillBeSent') {
+          mockClient.Network.requestWillBeSent = callback as Mock<[NetworkRequestEvent], void>;
+        } else if (event === 'Network.responseReceived') {
+          mockClient.Network.responseReceived = callback as Mock<[NetworkResponseEvent], void>;
+        } else if (event === 'Console.messageAdded') {
+          mockClient.Console.messageAdded = callback as Mock<[{ message: ConsoleMessage }], void>;
+        } else if (event === 'Log.entryAdded') {
+          mockClient.Log.entryAdded = callback as Mock<[{ entry: DevToolsLogEntry }], void>;
+        }
+      })
+    } as MockCDPClient;
 
     // Set up default successful responses
     mockFetch
@@ -200,8 +221,9 @@ describe('ChromeExtractor', () => {
       // Set up the mock client to emit a log event immediately
       mockClient.on.mockImplementation((event, callback) => {
         if (event === 'Console.messageAdded') {
-          callback({
+          (callback as ConsoleCallback)({
             message: {
+              source: 'console-api',
               level: 'info',
               text: 'Test log',
               timestamp: Date.now()
@@ -255,17 +277,18 @@ describe('ChromeExtractor', () => {
 
   describe('Log Collection', () => {
     it('should suppress DEPRECATED_ENDPOINT errors in console logs', async () => {
-      extractor = new TestableChromeExtractor({});
       const promise = extractor.extract();
 
-      const logs: CollectedLogEntry[] = [];
+      // Create a valid ConsoleMessage
       const consoleMessage: ConsoleMessage = {
-        source: 'console',
+        source: 'console-api',
         level: 'error',
         text: 'Registration response error message: DEPRECATED_ENDPOINT',
-        timestamp: new Date(Date.now()).toISOString()
+        timestamp: Date.now() / 1000
       };
-      extractor.injectTestEvent('console', consoleMessage, logs);
+
+      // Simulate the console message being received
+      mockClient.Console.messageAdded({ message: consoleMessage });
 
       vi.advanceTimersByTime(15000);
       await vi.runAllTimersAsync();
@@ -274,23 +297,24 @@ describe('ChromeExtractor', () => {
       const filteredLogs = logsAfterExtraction.filter(
         (log) =>
           log.content.includes('DEPRECATED_ENDPOINT') &&
-          log.level === 'warning'
+          log.content.includes('"level": "warning"')
       );
       expect(filteredLogs).toHaveLength(0);
     });
 
     it('should not suppress other errors in console logs', async () => {
-      extractor = new TestableChromeExtractor({});
       const promise = extractor.extract();
 
-      const logs: CollectedLogEntry[] = [];
+      // Create a valid ConsoleMessage
       const consoleMessage: ConsoleMessage = {
-        source: 'console',
+        source: 'console-api',
         level: 'error',
         text: 'Some other error occurred',
-        timestamp: new Date(Date.now()).toISOString()
+        timestamp: Date.now() / 1000
       };
-      extractor.injectTestEvent('console', consoleMessage, logs);
+
+      // Simulate the console message being received
+      mockClient.Console.messageAdded({ message: consoleMessage });
 
       vi.advanceTimersByTime(15000);
       await vi.runAllTimersAsync();
@@ -299,31 +323,31 @@ describe('ChromeExtractor', () => {
       const filteredLogs = logsAfterExtraction.filter(
         (log) =>
           log.content.includes('Some other error occurred') &&
-          log.level === 'error'
+          log.content.includes('"level": "error"')
       );
       expect(filteredLogs).toHaveLength(1);
     });
 
     it('should handle network errors during log collection', async () => {
-      extractor = new TestableChromeExtractor({});
       const promise = extractor.extract();
 
-      const logs: CollectedLogEntry[] = [];
       const networkRequest: NetworkRequest = {
         requestId: '123',
         url: 'http://example.com',
         method: 'GET',
         headers: {},
-        timestamp: new Date(Date.now()).toISOString()
+        timestamp: Date.now() / 1000
       };
-      extractor.injectTestEvent('network', networkRequest, logs);
+
+      // Simulate the network request being received
+      mockClient.Network.requestWillBeSent({ request: networkRequest });
 
       vi.advanceTimersByTime(15000);
       await vi.runAllTimersAsync();
       const logsAfterExtraction = await promise;
 
       const filteredLogs = logsAfterExtraction.filter(
-        (log) => log.type === 'network' && log.content.includes('http://example.com')
+        (log) => log.content.includes('network') && log.content.includes('http://example.com')
       );
       expect(filteredLogs).toHaveLength(1);
     });
@@ -337,25 +361,30 @@ describe('ChromeExtractor', () => {
 
       const promise = extractor.extract();
 
-      // Simulate a React hook event directly using injectTestEvent
-      extractor.injectTestEvent('reacthook', {
+      // Create valid ConsoleMessages
+      const useStateMessage: ConsoleMessage = {
+        source: 'console-api',
         level: 'log',
         text: "[CLiTS-React-Monitor] useState called",
-        parameters: [{ type: 'string', value: 'React Hook Event' }],
-        timestamp: new Date(Date.now()).toISOString()
-      });
-      extractor.injectTestEvent('reacthook', {
+        timestamp: Date.now() / 1000
+      };
+
+      const useEffectMessage: ConsoleMessage = {
+        source: 'console-api',
         level: 'log',
         text: "[CLiTS-React-Monitor] useEffect called",
-        parameters: [{ type: 'string', value: 'React Hook Event' }],
-        timestamp: new Date(Date.now()).toISOString()
-      });
+        timestamp: Date.now() / 1000
+      };
+
+      // Simulate React hook events through Console messages
+      mockClient.Console.messageAdded({ message: useStateMessage });
+      mockClient.Console.messageAdded({ message: useEffectMessage });
 
       vi.advanceTimersByTime(15000);
       await vi.runAllTimersAsync();
-      const logs = await promise;
+      const logsAfterExtraction = await promise;
 
-      const reactHookLogs = logs.filter(log => log.type === 'reacthook');
+      const reactHookLogs = logsAfterExtraction.filter(log => log.content.includes('reacthook'));
       expect(reactHookLogs.length).toBeGreaterThan(0);
       expect(reactHookLogs.some(log => log.content.includes('[CLiTS-React-Monitor] useState called'))).toBe(true);
       expect(reactHookLogs.some(log => log.content.includes('[CLiTS-React-Monitor] useEffect called'))).toBe(true);
@@ -370,19 +399,22 @@ describe('ChromeExtractor', () => {
 
       const promise = extractor.extract();
 
-      // Simulate a DOM mutation log directly using injectTestEvent
-      extractor.injectTestEvent('dommutation', {
+      // Create a valid ConsoleMessage
+      const domMutationMessage: ConsoleMessage = {
+        source: 'console-api',
         level: 'log',
         text: "[CLiTS-DOM-Monitor] DOM Mutation:",
-        parameters: [{ type: 'object', value: { type: 'attributes', target: 'DIV' } }],
-        timestamp: new Date(Date.now()).toISOString()
-      });
+        timestamp: Date.now() / 1000
+      };
+
+      // Simulate DOM mutation events through Console messages
+      mockClient.Console.messageAdded({ message: domMutationMessage });
 
       vi.advanceTimersByTime(15000);
       await vi.runAllTimersAsync();
-      const logs = await promise;
+      const logsAfterExtraction = await promise;
 
-      const domMutationLogs = logs.filter(log => log.type === 'dommutation');
+      const domMutationLogs = logsAfterExtraction.filter(log => log.content.includes('dommutation'));
       expect(domMutationLogs.some(log => log.content.includes('[CLiTS-DOM-Monitor] DOM Mutation:'))).toBe(true);
     });
   });
@@ -395,18 +427,16 @@ describe('ChromeExtractor', () => {
 
       const promise = extractor.extract();
 
-      // Simulate a CSS change log directly using injectTestEvent
-      extractor.injectTestEvent('csschange', {
-        header: { styleSheetId: '1', origin: 'regular', sourceURL: 'style.css' },
-        timestamp: new Date(Date.now()).toISOString(), // Ensure ISO string for timestamp
-        details: {} // Add a details property to match CollectedLogEntry
+      // Simulate CSS change events through CSS domain
+      mockClient.CSS.stylesheetAdded({
+        header: { styleSheetId: '1', origin: 'regular', sourceURL: 'style.css' }
       });
 
       vi.advanceTimersByTime(15000);
       await vi.runAllTimersAsync();
-      const logs = await promise;
+      const logsAfterExtraction = await promise;
 
-      const cssChangeLogs = logs.filter(log => log.type === 'csschange');
+      const cssChangeLogs = logsAfterExtraction.filter(log => log.content.includes('csschange'));
       expect(cssChangeLogs.length).toBeGreaterThan(0);
       expect(cssChangeLogs[0].content).toContain('stylesheetAdded');
     });
@@ -420,19 +450,22 @@ describe('ChromeExtractor', () => {
 
       const promise = extractor.extract();
 
-      // Simulate a Redux action log directly using injectTestEvent
-      extractor.injectTestEvent('redux', {
+      // Create a valid ConsoleMessage
+      const reduxMessage: ConsoleMessage = {
+        source: 'console-api',
         level: 'log',
         text: "[CLiTS-Redux-Monitor] Redux action dispatched:",
-        parameters: [{ type: 'object', value: { action: { type: 'TEST_ACTION' } } }],
-        timestamp: new Date(Date.now()).toISOString()
-      });
+        timestamp: Date.now() / 1000
+      };
+
+      // Simulate Redux action events through Console messages
+      mockClient.Console.messageAdded({ message: reduxMessage });
 
       vi.advanceTimersByTime(15000);
       await vi.runAllTimersAsync();
-      const logs = await promise;
+      const logsAfterExtraction = await promise;
 
-      const reduxLogs = logs.filter(log => log.type === 'redux');
+      const reduxLogs = logsAfterExtraction.filter(log => log.content.includes('redux'));
       expect(reduxLogs.some(log => log.content.includes('[CLiTS-Redux-Monitor] Redux action dispatched:'))).toBe(true);
     });
   });
@@ -444,105 +477,55 @@ describe('ChromeExtractor', () => {
       });
 
       const promise = extractor.extract();
-      
-      // Simulate an Event Loop log directly using injectTestEvent
-      extractor.injectTestEvent('eventloop', {
-        level: 'log',
-        text: "[CLiTS-EventLoop-Monitor] Long Animation Frame detected:",
-        parameters: [{type: 'object', value: {duration: 60, blockingDuration: 10}}],
-        timestamp: new Date(Date.now()).toISOString()
+
+      // Simulate Event Loop events through Console messages
+      mockClient.Console.messageAdded({
+        message: {
+          source: 'console-api',
+          level: 'log',
+          text: "[CLiTS-EventLoop-Monitor] Long Animation Frame detected:",
+          timestamp: Date.now() / 1000
+        }
       });
 
       vi.advanceTimersByTime(15000);
       await vi.runAllTimersAsync();
-      const logs = await promise;
+      const logsAfterExtraction = await promise;
 
-      const eventLoopLogs = logs.filter(log => log.type === 'eventloop');
+      const eventLoopLogs = logsAfterExtraction.filter(log => log.content.includes('eventloop'));
       expect(eventLoopLogs.some(log => log.content.includes('[CLiTS-EventLoop-Monitor] Long Animation Frame detected:'))).toBe(true);
     });
   });
 
   describe('User Interaction Recording', () => {
     it('should correctly process user interaction events', async () => {
-        extractor = new TestableChromeExtractor({
-            includeUserInteractionRecording: true,
-        });
+      extractor = new TestableChromeExtractor({
+        includeUserInteractionRecording: true,
+      });
 
-        const promise = extractor.extract();
+      const promise = extractor.extract();
 
-        // Simulate a User Interaction log directly using injectTestEvent
-        extractor.injectTestEvent('userinteraction', {
-            level: 'log',
-            text: "[CLiTS-Interaction-Monitor] click event:",
-            parameters: [{type: 'object', value: {target: 'BUTTON#my-button'}}],
-            timestamp: new Date(Date.now()).toISOString()
-        });
+      // Simulate User Interaction events through Console messages
+      mockClient.Console.messageAdded({
+        message: {
+          source: 'console-api',
+          level: 'log',
+          text: "[CLiTS-Interaction-Monitor] click event:",
+          timestamp: Date.now() / 1000
+        }
+      });
 
-        vi.advanceTimersByTime(15000);
-        await vi.runAllTimersAsync();
-        const logs = await promise;
+      vi.advanceTimersByTime(15000);
+      await vi.runAllTimersAsync();
+      const logsAfterExtraction = await promise;
 
-        const interactionLogs = logs.filter(log => log.type === 'userinteraction');
-        expect(interactionLogs.some(log => log.content.includes('[CLiTS-Interaction-Monitor] click event:'))).toBe(true);
+      const interactionLogs = logsAfterExtraction.filter(log => log.content.includes('userinteraction'));
+      expect(interactionLogs.some(log => log.content.includes('[CLiTS-Interaction-Monitor] click event:'))).toBe(true);
     });
   });
 
   describe('Cleanup', () => {
     it('should properly clean up resources on success', async () => {
-      // Mock successful connection
-      const mockClient: MockCDPClient = {
-        Network: {
-          enable: vi.fn().mockResolvedValue(undefined),
-          disable: vi.fn(),
-          requestWillBeSent: vi.fn(),
-          responseReceived: vi.fn()
-        },
-        Console: {
-          enable: vi.fn().mockResolvedValue(undefined),
-          disable: vi.fn(),
-          messageAdded: vi.fn()
-        },
-        Log: {
-          enable: vi.fn().mockResolvedValue(undefined),
-          disable: vi.fn(),
-          entryAdded: vi.fn()
-        },
-        Runtime: {
-          enable: vi.fn().mockResolvedValue(undefined),
-          disable: vi.fn(),
-          evaluate: vi.fn()
-        },
-        Performance: {
-          enable: vi.fn().mockResolvedValue(undefined),
-          disable: vi.fn(),
-          metrics: vi.fn()
-        },
-        CSS: {
-          enable: vi.fn().mockResolvedValue(undefined),
-          disable: vi.fn(),
-          stylesheetAdded: vi.fn(),
-          stylesheetRemoved: vi.fn(),
-          stylesheetChanged: vi.fn()
-        },
-        close: vi.fn(),
-        on: vi.fn()
-      };
-
-      mockFetch
-        .mockResolvedValueOnce(createMockResponse(true))
-        .mockResolvedValueOnce(createMockResponse(true, [{
-          type: 'page',
-          url: 'http://example.com',
-          webSocketDebuggerUrl: 'ws://localhost:9222/devtools/page/123'
-        }]));
-
-      const mockCDP = vi.mocked(CDP);
-      mockCDP.mockResolvedValue(mockClient);
-
-      extractor = new TestableChromeExtractor({
-        enableReactHookMonitoring: true, // Enable this to ensure Runtime.disable is called
-      });
-
       const promise = extractor.extract();
       
       // Fast-forward through log collection
@@ -557,74 +540,14 @@ describe('ChromeExtractor', () => {
       expect(mockClient.Performance.disable).toHaveBeenCalled();
       expect(mockClient.CSS.disable).toHaveBeenCalled();
       expect(mockClient.close).toHaveBeenCalled();
-    }, 20000);
+    });
 
     it('should properly clean up resources on failure', async () => {
-      // Mock successful connection but failed log collection
-      const mockClient: MockCDPClient = {
-        Network: {
-          enable: vi.fn().mockRejectedValue(new Error('Network enable failed')),
-          disable: vi.fn(),
-          requestWillBeSent: vi.fn(),
-          responseReceived: vi.fn()
-        },
-        Console: {
-          enable: vi.fn(),
-          disable: vi.fn(),
-          messageAdded: vi.fn()
-        },
-        Log: {
-          enable: vi.fn().mockRejectedValue(new Error('Log enable failed')),
-          disable: vi.fn(),
-          entryAdded: vi.fn()
-        },
-        Runtime: {
-          enable: vi.fn().mockResolvedValue(undefined),
-          disable: vi.fn(),
-          evaluate: vi.fn()
-        },
-        Performance: {
-          enable: vi.fn(),
-          disable: vi.fn(),
-          metrics: vi.fn()
-        },
-        CSS: {
-          enable: vi.fn(),
-          disable: vi.fn(),
-          stylesheetAdded: vi.fn(),
-          stylesheetRemoved: vi.fn(),
-          stylesheetChanged: vi.fn()
-        },
-        close: vi.fn(),
-        on: vi.fn()
-      };
+      // Mock Network.enable to fail
+      mockClient.Network.enable.mockRejectedValue(new Error('Network enable failed'));
 
-      mockFetch
-        .mockResolvedValueOnce(createMockResponse(true))
-        .mockResolvedValueOnce(createMockResponse(true, [{
-          type: 'page',
-          url: 'http://example.com',
-          webSocketDebuggerUrl: 'ws://localhost:9222/devtools/page/123'
-        }]));
-
-      const mockCDP = vi.mocked(CDP);
-      mockCDP.mockResolvedValue(mockClient);
-
-      // Mock the error to be non-suppressible for this test
-      vi.spyOn(ChromeErrorHandler, 'isChromeError').mockReturnValue(false);
-      vi.spyOn(PlatformErrorHandler, 'isPlatformError').mockReturnValue(false);
-
-      extractor = new TestableChromeExtractor({
-        enableReactHookMonitoring: true, // Enable this to ensure Runtime.disable is called
-      });
-
-      const promise = extractor.extract();
-
-      // Fast-forward through log collection
-      vi.advanceTimersByTime(15000);
-      await vi.runAllTimersAsync();
       // We expect this to reject, so we catch the error.
-      await expect(promise).rejects.toThrow();
+      await expect(extractor.extract()).rejects.toThrow();
 
       // These should still be called even on failure
       expect(mockClient.Network.disable).toHaveBeenCalled();
@@ -634,6 +557,6 @@ describe('ChromeExtractor', () => {
       expect(mockClient.Performance.disable).toHaveBeenCalled();
       expect(mockClient.CSS.disable).toHaveBeenCalled();
       expect(mockClient.close).toHaveBeenCalled();
-    }, 20000);
+    });
   });
 }); 
