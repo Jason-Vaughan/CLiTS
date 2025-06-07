@@ -37,10 +37,11 @@
     "lint:fix": "eslint src --ext .ts --fix",
     "prepare": "npm run build",
     "prepublishOnly": "npm run test && npm run lint",
-    "test": "vitest run --exclude '{src/**/*.spec.ts,moveto_OnDeck/**/*}'",
+    "test": "vitest",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "vitest run 'src/**/*.spec.ts'"
+    "test:e2e": "playwright test",
+    "docs:generate": "typedoc"
   },
   "keywords": [
     "cli",
@@ -75,6 +76,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.52.0",
+    "@types/chrome-remote-interface": "^0.31.7",
     "@types/inquirer": "^9.0.8",
     "@types/node": "^20.11.0",
     "@types/node-fetch": "^2.6.12",
@@ -83,13 +85,17 @@
     "@vitest/coverage-v8": "^1.2.1",
     "@vitest/ui": "^1.2.1",
     "eslint": "^8.57.0",
+    "rollup": "^4.12.0",
     "ts-node": "^10.9.2",
+    "typedoc": "^0.28.5",
+    "typedoc-plugin-markdown": "^4.6.4",
     "typescript": "^5.3.3",
-    "vitest": "^1.6.1",
-    "@types/chrome-remote-interface": "^0.31.7",
-    "rollup": "^4.12.0"
+    "vitest": "^1.6.1"
   },
   "dependencies": {
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.6",
+    "@types/tabtab": "^3.0.4",
     "chalk": "^5.4.1",
     "chrome-remote-interface": "^0.33.3",
     "commander": "^12.0.0",
@@ -98,6 +104,10 @@
     "inquirer": "^9.3.7",
     "node-fetch": "^3.3.2",
     "ora": "^8.2.0",
-    "winston": "^3.17.0"
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "tabtab": "^3.0.2",
+    "winston": "^3.17.0",
+    "winston-daily-rotate-file": "^5.0.0"
   }
 }

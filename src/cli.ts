@@ -7,6 +7,7 @@ import { readFileSync } from 'fs';
 import { PathResolver } from './utils/path-resolver.js';
 import { ChromeExtractor } from './chrome-extractor.js';
 import inquirer from 'inquirer';
+import tabtab from 'tabtab';
 
 const pathResolver = PathResolver.getInstance();
 const packageJson = JSON.parse(readFileSync(pathResolver.resolvePath('package.json'), 'utf8'));
@@ -17,55 +18,101 @@ async function main(): Promise<void> {
   program
     .name('clits')
     .description('CLI tool for extracting and sharing debugging data for AI and web projects (CLITS)')
-    .version(packageJson.version);
+    .version(packageJson.version)
+    .addHelpText('after', `
+Examples:
+  $ clits extract --chrome --interactive
+  $ clits extract --source ./logs --patterns "*.log" --output-file ./output.json
+    `);
 
   program
     .command('extract')
-    .description('Extract debugging data from specified sources')
+    .description('Extract debugging data from specified sources like local files or a running Chrome instance.')
     .option('-s, --source <path>', 'Source directory or file path to extract logs from')
     .option('-p, --patterns <patterns...>', 'File patterns to match (e.g., "*.log")')
     .option('-m, --max-size <size>', 'Maximum file size in MB to process', '10')
     .option('-f, --max-files <count>', 'Maximum number of files to process', '100')
-    .option('--chrome', 'Extract logs from Chrome DevTools (requires Chrome running with --remote-debugging-port=9222)')
-    .option('--chrome-host <host>', 'Chrome DevTools host', 'localhost')
-    .option('--chrome-port <port>', 'Chrome DevTools port', '9222')
-    .option('--no-network', 'Exclude network logs from Chrome DevTools')
-    .option('--no-console', 'Exclude console logs from Chrome DevTools')
-    .option('--log-levels <levels>', 'Filter by log levels (comma-separated)', 'error,warning,info,debug')
-    .option('--sources <sources>', 'Filter by sources (comma-separated)', 'network,console,devtools')
-    .option('--domains <domains>', 'Filter by domain patterns (comma-separated)')
-    .option('--keywords <keywords>', 'Filter by keywords (comma-separated)')
-    .option('--exclude <patterns>', 'Exclude logs matching patterns (comma-separated)')
-    .option('--group-by-source', 'Group logs by their source')
-    .option('--group-by-level', 'Group logs by their level')
-    .option('--no-timestamps', 'Exclude timestamps from output')
-    .option('--no-stack-traces', 'Exclude stack traces from output')
-    .option('--output-file <path>', 'Save logs to the specified file path')
-    .option('--error-summary', 'Include summary statistics of error frequencies')
-    .option('--live-mode [duration]', 'Run in live mode for specified duration in seconds', '60')
-    .option('--interactive-login', 'Use interactive wizard for Chrome inspection')
-    .option('--target-id <id>', 'Specify a Chrome tab/page target ID to connect to')
+    .option('--chrome', 'Extract logs and other data from a running Chrome instance.')
+    .option('--chrome-host <host>', 'Specify the host for the Chrome DevTools protocol.', 'localhost')
+    .option('--chrome-port <port>', 'Specify the port for the Chrome DevTools protocol.', '9222')
+    .option('--no-network', 'Disable network log extraction from Chrome DevTools.')
+    .option('--no-console', 'Disable console log extraction from Chrome DevTools.')
+    .option('--log-levels <levels>', 'Comma-separated list of log levels to include (e.g., "error,warning").', 'error,warning,info,debug')
+    .option('--sources <sources>', 'Comma-separated list of log sources to include (e.g., "network,console").', 'network,console,devtools')
+    .option('--domains <domains>', 'Comma-separated list of domain patterns to filter network requests.')
+    .option('--keywords <keywords>', 'Comma-separated list of keywords to filter logs.')
+    .option('--exclude <patterns>', 'Comma-separated list of regex patterns to exclude logs.')
+    .option('--group-by-source', 'Group extracted logs by their source (e.g., network, console).')
+    .option('--group-by-level', 'Group extracted logs by their log level (e.g., error, warning).')
+    .option('--no-timestamps', 'Omit timestamps from the log output.')
+    .option('--no-stack-traces', 'Omit stack traces from error logs.')
+    .option('--output-file <path>', 'Path to save the extracted logs to a file.')
+    .option('--error-summary', 'Include a summary of error frequencies in the output.')
+    .option('--live-mode [duration]', 'Run in live mode, continuously extracting logs for a specified duration in seconds.', '60')
+    .option('--interactive-login', 'Prompt for manual login within the browser before extraction.')
+    .option('--target-id <id>', 'Specify a Chrome tab/page Target ID to connect to, skipping interactive selection.')
+    .option('-i, --interactive', 'Run in interactive mode to select monitoring options.')
     .action(async (options) => {
       try {
+        const extractionOptions: any = { ...options };
+
+        if (options.interactive) {
+          const answers = await inquirer.prompt([
+            {
+              type: 'checkbox',
+              name: 'monitoring',
+              message: 'Select monitoring features to enable:',
+              choices: [
+                { name: 'React Hook Monitoring', value: 'enableReactHookMonitoring' },
+                { name: 'WebSocket Monitoring', value: 'includeWebSockets' },
+                { name: 'JWT Monitoring', value: 'includeJwtMonitoring' },
+                { name: 'GraphQL Monitoring', value: 'includeGraphqlMonitoring' },
+                { name: 'Redux State Monitoring', value: 'includeReduxMonitoring' },
+                { name: 'Performance Monitoring', value: 'includePerformanceMonitoring' },
+                { name: 'Event Loop Monitoring', value: 'includeEventLoopMonitoring' },
+                { name: 'User Interaction Recording', value: 'includeUserInteractionRecording' },
+                { name: 'DOM Mutation Monitoring', value: 'includeDomMutationMonitoring' },
+                { name: 'CSS Change Monitoring', value: 'includeCssChangeMonitoring' },
+                { name: 'Headless Mode', value: 'headless' },
+              ]
+            }
+          ]);
+
+          answers.monitoring.forEach((feature: string) => {
+            extractionOptions[feature] = true;
+          });
+        }
+
         // Chrome DevTools extraction
-        if (options.chrome) {
+        if (extractionOptions.chrome) {
           const chromeExtractor = new ChromeExtractor({
-            port: parseInt(options.chromePort),
-            host: options.chromeHost,
-            includeNetwork: options.network !== false,
-            includeConsole: options.console !== false,
+            port: parseInt(extractionOptions.chromePort),
+            host: extractionOptions.chromeHost,
+            includeNetwork: extractionOptions.network !== false,
+            includeConsole: extractionOptions.console !== false,
+            enableReactHookMonitoring: extractionOptions.enableReactHookMonitoring,
+            includeWebSockets: extractionOptions.includeWebSockets,
+            includeJwtMonitoring: extractionOptions.includeJwtMonitoring,
+            includeGraphqlMonitoring: extractionOptions.includeGraphqlMonitoring,
+            includeReduxMonitoring: extractionOptions.includeReduxMonitoring,
+            includePerformanceMonitoring: extractionOptions.includePerformanceMonitoring,
+            includeEventLoopMonitoring: extractionOptions.includeEventLoopMonitoring,
+            includeUserInteractionRecording: extractionOptions.includeUserInteractionRecording,
+            includeDomMutationMonitoring: extractionOptions.includeDomMutationMonitoring,
+            includeCssChangeMonitoring: extractionOptions.includeCssChangeMonitoring,
+            headless: extractionOptions.headless,
             filters: {
-              logLevels: options.logLevels?.split(',') as any[],
-              sources: options.sources?.split(',') as any[],
-              domains: options.domains?.split(','),
-              keywords: options.keywords?.split(','),
-              excludePatterns: options.exclude?.split(','),
+              logLevels: extractionOptions.logLevels?.split(',') as any[],
+              sources: extractionOptions.sources?.split(',') as any[],
+              domains: extractionOptions.domains?.split(','),
+              keywords: extractionOptions.keywords?.split(','),
+              excludePatterns: extractionOptions.exclude?.split(','),
             },
             format: {
-              groupBySource: options.groupBySource,
-              groupByLevel: options.groupByLevel,
-              includeTimestamp: options.noTimestamps !== true,
-              includeStackTrace: options.noStackTraces !== true,
+              groupBySource: extractionOptions.groupBySource,
+              groupByLevel: extractionOptions.groupByLevel,
+              includeTimestamp: extractionOptions.noTimestamps !== true,
+              includeStackTrace: extractionOptions.noStackTraces !== true,
             },
             reconnect: {
               enabled: true, // Always enable reconnection for CLI usage
@@ -74,7 +121,7 @@ async function main(): Promise<void> {
             },
           });
 
-          let targetId: string | undefined = options.targetId;
+          let targetId: string | undefined = extractionOptions.targetId;
 
           if (!targetId) {
             const targets = await chromeExtractor.getDebuggablePageTargets();
@@ -114,13 +161,13 @@ async function main(): Promise<void> {
         }
 
         // File system extraction
-        if (options.source) {
-          const { exists, error } = pathResolver.validatePath(options.source);
+        if (extractionOptions.source) {
+          const { exists, error } = pathResolver.validatePath(extractionOptions.source);
           if (!exists) {
             console.error(`[CLiTS-INSPECTOR] Error: Invalid source path. ${error}. Please ensure the path is correct and accessible.`);
             process.exit(1);
           }
-          console.log(`Extracting logs from ${options.source}...`);
+          console.log(`Extracting logs from ${extractionOptions.source}...`);
           // TODO: Implement file system extraction
           return;
         }
@@ -140,6 +187,26 @@ async function main(): Promise<void> {
         process.exit(1);
       }
     });
+
+  // Add command completion
+  program.command('completion', 'Generate completion script for your shell.')
+    .action(async () => {
+        await tabtab.install({
+            name: 'clits',
+            completer: 'clits'
+        });
+    });
+
+  // Handle completion requests
+  if (process.argv.slice(2)[0] === 'completion') {
+    const env = tabtab.parseEnv(process.env);
+    if (env.complete) {
+      const commands = program.commands.map(cmd => cmd.name());
+      const options = program.options.map(opt => opt.long).filter(Boolean) as string[];
+      const allCompletions = [...commands, ...options];
+      return tabtab.log(allCompletions);
+    }
+  }
 
   await program.parseAsync();
 }

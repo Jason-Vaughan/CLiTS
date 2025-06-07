@@ -22,12 +22,24 @@ export default defineConfig({
         singleFork: true,
       },
     },
+    reporters: process.env.CI ? ['dot'] : ['default'],
     coverage: {
-      reporter: ['text', 'lcov'],
+      provider: 'v8',
+      reporter: ['text', 'json', 'html', 'lcov'],
+      reportsDirectory: './coverage',
+      include: ['src/**/*.ts'],
       exclude: [
-        'src/**/*.d.ts',
-        'src/**/__tests__/**',
+        'src/index.ts',
+        'src/types/**/*.ts',
+        'src/**/index.ts',
+        '**/__tests__/**'
       ],
+      thresholds: {
+        statements: 80,
+        branches: 80,
+        functions: 80,
+        lines: 80,
+      },
     },
     env: {
       CHROME_TEST_MODE: process.env.CI ? 'mock' : 'real',

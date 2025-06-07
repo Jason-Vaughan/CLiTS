@@ -8,6 +8,13 @@ import fetch from 'node-fetch';
 import { PlatformErrorHandler } from './platform/error-handler.js';
 import { ChromeErrorHandler, RetryConfig } from './platform/chrome-error-handler.js';
 import { EventEmitter } from 'events';
+import { REACT_HOOK_MONITOR_SCRIPT } from './utils/react-hook-monitor.js';
+import { Buffer } from 'buffer';
+import { REDUX_STATE_MONITOR_SCRIPT } from './utils/redux-state-monitor.js';
+import { EVENT_LOOP_MONITOR_SCRIPT } from './utils/event-loop-monitor.js';
+import { USER_INTERACTION_MONITOR_SCRIPT } from './utils/user-interaction-monitor.js';
+import { DOM_MUTATION_MONITOR_SCRIPT } from './utils/dom-mutation-monitor.js';
+import { DataSanitizer, SanitizationRule } from './utils/data-sanitizer.js';
 
 // Type declarations for Chrome DevTools Protocol
 type NetworkRequest = {
@@ -16,6 +23,7 @@ type NetworkRequest = {
   method: string;
   headers: Record<string, string>;
   timestamp: number;
+  postData?: string;
 };
 
 type NetworkResponse = {
@@ -39,11 +47,107 @@ type DevToolsLogEntry = {
   timestamp: number;
 };
 
+type JwtTokenDetails = {
+  token: string;
+  decodedPayload?: any;
+  header?: any;
+  signatureVerified?: boolean;
+  expiresAt?: string;
+  issuedAt?: string;
+};
+
+type GraphQLEvent = {
+  requestId: string;
+  url: string;
+  requestBody?: any;
+  responseBody?: any;
+  graphqlQuery?: string;
+  graphqlVariables?: any;
+  graphqlOperationName?: string;
+  errors?: any[];
+  timestamp: number;
+  type: 'request' | 'response';
+};
+
+type CorrelatedNetworkEntry = {
+  request: NetworkRequest;
+  response: NetworkResponse;
+};
+
+type WebSocketFrame = {
+  opcode: number;
+  mask: boolean;
+  payloadData: string;
+};
+
+type WebSocketEvent = {
+  requestId: string;
+  timestamp: number;
+  url: string;
+  type: 'webSocketCreated' | 'webSocketClosed' | 'webSocketFrameReceived' | 'webSocketFrameSent';
+  frame?: WebSocketFrame;
+  message?: string; // For created/closed events
+};
+
+type ReduxEvent = {
+  type: 'action' | 'stateChange';
+  action?: any;
+  prevState?: any;
+  newState?: any;
+  timestamp: number;
+};
+
+type PerformanceMetricEvent = {
+  name: string;
+  value: number;
+  timestamp: number;
+  title?: string;
+};
+
+type EventLoopMetricEvent = {
+  duration: number;
+  blockingDuration: number;
+  startTime: number;
+  scripts: Array<{ invoker?: string; sourceURL?: string; sourceFunctionName?: string; duration: number }>;
+  entry: any; // The raw PerformanceEntry object
+};
+
+type UserInteractionEvent = {
+  type: string;
+  target: string;
+  timestamp: number;
+  details: any;
+};
+
+type DomMutationEvent = {
+  type: string;
+  target: string;
+  details: any;
+};
+
+type CssChangeEvent = {
+  type: 'stylesheetAdded' | 'stylesheetRemoved' | 'stylesheetChanged';
+  styleSheetId: string;
+  header?: any; // For added events
+  change?: any; // For changed events
+  timestamp: number;
+};
+
+type CredentialDetails = {
+  type: 'apiKey' | 'basicAuth' | 'jwt' | 'unknown';
+  value: string;
+  source: 'header' | 'body';
+  key?: string; // e.g., 'Authorization', 'x-api-key'
+};
+
 // Add type declaration for CDP client with event handling
 interface CDPClient extends EventEmitter {
   Network: any;
   Console: any;
   Log: any;
+  Runtime: any;
+  Performance: any;
+  CSS: any; // Added for CSS monitoring
   close: () => Promise<void>;
 }
 
@@ -77,7 +181,7 @@ export interface ChromeExtractorOptions {
   };
   filters?: {
     logLevels?: Array<'error' | 'warning' | 'info' | 'debug'>;
-    sources?: Array<'network' | 'console' | 'devtools'>;
+    sources?: Array<'network' | 'console' | 'devtools' | 'websocket' | 'jwt' | 'graphql' | 'redux' | 'performance' | 'eventloop' | 'userinteraction' | 'dommutation' | 'csschange'>;
     domains?: string[];  // Domain patterns to match (e.g. ["*.google.com", "api.*"])
     keywords?: string[]; // Keywords to match in log content
     excludePatterns?: string[]; // Regex patterns to exclude
@@ -89,12 +193,24 @@ export interface ChromeExtractorOptions {
     includeTimestamp?: boolean;
     includeStackTrace?: boolean;
   };
+  enableReactHookMonitoring?: boolean;
+  includeWebSockets?: boolean;
+  includeJwtMonitoring?: boolean;
+  includeGraphqlMonitoring?: boolean;
+  includeReduxMonitoring?: boolean;
+  includePerformanceMonitoring?: boolean;
+  includeEventLoopMonitoring?: boolean;
+  includeUserInteractionRecording?: boolean;
+  includeDomMutationMonitoring?: boolean;
+  includeCssChangeMonitoring?: boolean;
+  headless?: boolean; // Added for headless mode
+  sanitizationRules?: SanitizationRule[];
 }
 
 interface CollectedLogEntry {
-  type: 'network' | 'console' | 'log';
+  type: 'network' | 'console' | 'log' | 'websocket' | 'jwt' | 'graphql' | 'redux' | 'performance' | 'eventloop' | 'userinteraction' | 'dommutation' | 'csschange' | 'credential';
   timestamp: string;
-  details: NetworkRequest | NetworkResponse | ConsoleMessage | DevToolsLogEntry;
+  details: NetworkRequest | NetworkResponse | ConsoleMessage | DevToolsLogEntry | CorrelatedNetworkEntry | WebSocketEvent | JwtTokenDetails | GraphQLEvent | ReduxEvent | PerformanceMetricEvent | EventLoopMetricEvent | UserInteractionEvent | DomMutationEvent | CssChangeEvent | CredentialDetails;
 }
 
 export class ChromeExtractor {
@@ -104,6 +220,9 @@ export class ChromeExtractor {
 
   private options: Required<ChromeExtractorOptions>;
   private chromeErrorHandler: ChromeErrorHandler;
+  private dataSanitizer: DataSanitizer;
+  private pendingNetworkRequests: Map<string, NetworkRequest> = new Map(); // Added for correlation
+  private pendingGraphqlRequests: Map<string, NetworkRequest> = new Map(); // Added for GraphQL correlation
 
   constructor(options: ChromeExtractorOptions = {}) {
     this.options = {
@@ -120,7 +239,7 @@ export class ChromeExtractor {
       },
       filters: {
         logLevels: options.filters?.logLevels || ['error', 'warning', 'info', 'debug'],
-        sources: options.filters?.sources || ['network', 'console', 'devtools'],
+        sources: options.filters?.sources || ['network', 'console', 'devtools', 'websocket', 'jwt', 'graphql', 'redux', 'performance', 'eventloop', 'userinteraction', 'dommutation', 'csschange'],
         domains: options.filters?.domains || [],
         keywords: options.filters?.keywords || [],
         excludePatterns: options.filters?.excludePatterns || [],
@@ -131,10 +250,23 @@ export class ChromeExtractor {
         groupByLevel: options.format?.groupByLevel ?? false,
         includeTimestamp: options.format?.includeTimestamp ?? true,
         includeStackTrace: options.format?.includeStackTrace ?? true
-      }
+      },
+      enableReactHookMonitoring: options.enableReactHookMonitoring ?? false,
+      includeWebSockets: options.includeWebSockets ?? false,
+      includeJwtMonitoring: options.includeJwtMonitoring ?? false,
+      includeGraphqlMonitoring: options.includeGraphqlMonitoring ?? false,
+      includeReduxMonitoring: options.includeReduxMonitoring ?? false,
+      includePerformanceMonitoring: options.includePerformanceMonitoring ?? false,
+      includeEventLoopMonitoring: options.includeEventLoopMonitoring ?? false,
+      includeUserInteractionRecording: options.includeUserInteractionRecording ?? false,
+      includeDomMutationMonitoring: options.includeDomMutationMonitoring ?? false,
+      includeCssChangeMonitoring: options.includeCssChangeMonitoring ?? false,
+      headless: options.headless ?? false,
+      sanitizationRules: options.sanitizationRules ?? []
     };
 
     this.chromeErrorHandler = new ChromeErrorHandler(this.options.retryConfig);
+    this.dataSanitizer = new DataSanitizer(this.options.sanitizationRules);
   }
 
   public async getDebuggablePageTargets(): Promise<Array<{ id: string; url: string; title: string; webSocketDebuggerUrl: string; }>> {
@@ -183,8 +315,14 @@ export class ChromeExtractor {
 
   // This method is now private and should be called with a specific debugger URL
   private async connectToDebugger(debuggerUrl: string): Promise<CDPClient> {
+    const cdpOptions: any = { target: debuggerUrl };
+    if (this.options.headless) {
+      cdpOptions.port = this.options.port;
+      cdpOptions.host = this.options.host;
+    }
+
     return this.chromeErrorHandler.executeWithRetry(
-      async () => CDP({ target: debuggerUrl }) as unknown as CDPClient,
+      async () => CDP(cdpOptions) as unknown as CDPClient,
       'Connecting to Chrome DevTools'
     );
   }
@@ -213,16 +351,38 @@ export class ChromeExtractor {
     }
 
     // Check source
-    const source = log.type as 'network' | 'console' | 'devtools';
+    const source = log.type as 'network' | 'console' | 'devtools' | 'websocket' | 'jwt' | 'graphql' | 'redux' | 'performance' | 'eventloop' | 'userinteraction' | 'dommutation' | 'csschange';
     if (!filters.sources?.includes(source)) {
       return false;
     }
 
-    // Check domains for network requests
-    if (log.type === 'network' && filters.domains && filters.domains.length > 0) {
-      const details = log.details as NetworkRequest;
+    // Check domains for network requests (and now correlated entries) and WebSockets
+    if ((log.type === 'network' || log.type === 'graphql') && filters.domains && filters.domains.length > 0) {
+      let url: string;
+      if (log.type === 'network') {
+        const details = log.details as NetworkRequest | NetworkResponse | CorrelatedNetworkEntry;
+        if ('url' in details && typeof details.url === 'string') { // NetworkRequest or NetworkResponse
+          url = details.url;
+        } else if ('request' in details && typeof details.request.url === 'string') { // CorrelatedNetworkEntry
+          url = details.request.url;
+        } else {
+          logger.warn('Invalid network entry for domain filtering: missing URL', { log });
+          return false;
+        }
+      } else { // log.type === 'graphql'
+        const details = log.details as GraphQLEvent;
+        url = details.url;
+      }
+      
+      if (!filters.domains.some(domain => 
+        new RegExp(domain.replace(/\*/g, '.*')).test(url)
+      )) {
+        return false;
+      }
+    } else if (log.type === 'websocket' && filters.domains && filters.domains.length > 0) {
+      const details = log.details as WebSocketEvent;
       if (!details || typeof details.url !== 'string') {
-        logger.warn('Invalid network request: missing or invalid url property', { log });
+        logger.warn('Invalid websocket entry for domain filtering: missing URL', { log });
         return false;
       }
       const url = details.url;
@@ -425,8 +585,74 @@ export class ChromeExtractor {
             entry += `[${log.timestamp}] `;
           }
           if (log.type === 'network') {
-            const req = log.details as NetworkRequest;
-            entry += `${req.method} ${req.url}`;
+            const details = log.details as NetworkRequest | NetworkResponse | CorrelatedNetworkEntry;
+            if ('request' in details && 'response' in details) {
+              entry += `[CORRELATED] ${details.request.method} ${details.request.url} - Status: ${details.response.status}`;
+            } else if ('url' in details) { // NetworkRequest
+              entry += `${(details as NetworkRequest).method} ${(details as NetworkRequest).url}`;
+            } else { // NetworkResponse
+              entry += `Response Status: ${(details as NetworkResponse).status}`;
+            }
+          } else if (log.type === 'websocket') {
+            const wsEvent = log.details as WebSocketEvent;
+            if (wsEvent.type === 'webSocketCreated') {
+              entry += `WebSocket Created: ${wsEvent.url}`;
+            } else if (wsEvent.type === 'webSocketClosed') {
+              entry += `WebSocket Closed: ${wsEvent.url}`;
+            } else if (wsEvent.type === 'webSocketFrameSent') {
+              entry += `WebSocket Frame Sent: ${wsEvent.frame?.payloadData}`;
+            } else if (wsEvent.type === 'webSocketFrameReceived') {
+              entry += `WebSocket Frame Received: ${wsEvent.frame?.payloadData}`;
+            }
+          } else if (log.type === 'jwt') {
+            const jwtDetails = log.details as JwtTokenDetails;
+            entry += `JWT Token: ${jwtDetails.token} (Expires: ${jwtDetails.expiresAt || 'N/A'})`;
+          } else if (log.type === 'graphql') {
+            const graphqlEvent = log.details as GraphQLEvent;
+            entry += `GraphQL ${graphqlEvent.type === 'request' ? 'Request' : 'Response'}: ${graphqlEvent.url}`;
+            if (graphqlEvent.graphqlQuery) {
+              entry += `\nQuery: ${graphqlEvent.graphqlQuery}`;
+            }
+            if (graphqlEvent.graphqlOperationName) {
+              entry += ` (Operation: ${graphqlEvent.graphqlOperationName})`;
+            }
+            if (graphqlEvent.errors && graphqlEvent.errors.length > 0) {
+              entry += `\nErrors: ${JSON.stringify(graphqlEvent.errors)}`;
+            }
+          } else if (log.type === 'redux') {
+            const reduxEvent = log.details as ReduxEvent;
+            if (reduxEvent.type === 'action') {
+              entry += `Redux Action: ${reduxEvent.action?.type} (State: ${JSON.stringify(reduxEvent.newState)})`;
+            } else if (reduxEvent.type === 'stateChange') {
+              entry += `Redux State Change: ${JSON.stringify(reduxEvent.newState)}`;
+            }
+          } else if (log.type === 'performance') {
+            const perfMetric = log.details as PerformanceMetricEvent;
+            entry += `Performance Metric: ${perfMetric.name} = ${perfMetric.value} (Title: ${perfMetric.title || 'N/A'})`;
+          } else if (log.type === 'eventloop') {
+            const eventLoopMetric = log.details as EventLoopMetricEvent;
+            entry += `Event Loop (Long Frame): Duration=${eventLoopMetric.duration}ms, Blocking=${eventLoopMetric.blockingDuration}ms`;
+            if (eventLoopMetric.scripts && eventLoopMetric.scripts.length > 0) {
+              entry += `\nScripts: ${eventLoopMetric.scripts.map(s => s.sourceFunctionName || s.sourceURL || 'Unknown').join(', ')}`;
+            }
+          } else if (log.type === 'userinteraction') {
+            const interactionEvent = log.details as UserInteractionEvent;
+            entry += `User Interaction: ${interactionEvent.type} on ${interactionEvent.target}`;
+            if (Object.keys(interactionEvent.details).length > 0) {
+              entry += ` (Details: ${JSON.stringify(interactionEvent.details)})`;
+            }
+          } else if (log.type === 'dommutation') {
+            const mutationEvent = log.details as DomMutationEvent;
+            entry += `DOM Mutation: ${mutationEvent.type} on ${mutationEvent.target}`;
+            if (Object.keys(mutationEvent.details).length > 0) {
+              entry += ` (Details: ${JSON.stringify(mutationEvent.details)})`;
+            }
+          } else if (log.type === 'csschange') {
+            const cssChangeEvent = log.details as CssChangeEvent;
+            entry += `CSS Change: ${cssChangeEvent.type} on stylesheet ${cssChangeEvent.styleSheetId}`;
+          } else if (log.type === 'credential') {
+            const credentialDetails = log.details as CredentialDetails;
+            entry += `Credential Detected: Type=${credentialDetails.type}, Source=${credentialDetails.source}, Key=${credentialDetails.key || 'N/A'}`;
           } else {
             const msg = log.details as ConsoleMessage | DevToolsLogEntry;
             entry += msg.text;
@@ -437,36 +663,129 @@ export class ChromeExtractor {
           return entry;
         }).join('\n');
 
+        const sanitizedContent = this.dataSanitizer.sanitize(content);
+
         return {
           filePath: `chrome-devtools://${groupKey}`,
-          content,
-          size: content.length,
+          content: sanitizedContent,
+          size: sanitizedContent.length,
           lastModified: new Date(groupLogs[0].timestamp)
         };
       });
     }
 
-    return formattedLogs.map(log => ({
-      filePath: `chrome-devtools://${log.type}/${log.timestamp}`,
-      content: JSON.stringify(log.details, null, 2),
-      size: JSON.stringify(log.details).length,
-      lastModified: new Date(log.timestamp)
-    }));
+    return formattedLogs.map(log => {
+      let content = '';
+      if (log.type === 'network') {
+        const details = log.details as NetworkRequest | NetworkResponse | CorrelatedNetworkEntry;
+        if ('request' in details && 'response' in details) {
+          content = JSON.stringify({
+            request: details.request,
+            response: details.response
+          }, null, 2);
+        } else {
+          content = JSON.stringify(details, null, 2);
+        }
+      } else if (log.type === 'websocket') {
+        content = JSON.stringify(log.details, null, 2);
+      } else if (log.type === 'jwt') {
+        content = JSON.stringify(log.details, null, 2);
+      } else if (log.type === 'graphql') {
+        content = JSON.stringify(log.details, null, 2);
+      } else if (log.type === 'redux') {
+        content = JSON.stringify(log.details, null, 2);
+      } else if (log.type === 'performance') {
+        content = JSON.stringify(log.details, null, 2);
+      } else if (log.type === 'eventloop') {
+        content = JSON.stringify(log.details, null, 2);
+      } else if (log.type === 'userinteraction') {
+        content = JSON.stringify(log.details, null, 2);
+      } else if (log.type === 'dommutation') {
+        content = JSON.stringify(log.details, null, 2);
+      } else if (log.type === 'csschange') {
+        content = JSON.stringify(log.details, null, 2);
+      } else if (log.type === 'credential') {
+        content = JSON.stringify(log.details, null, 2);
+      } else {
+        content = JSON.stringify(log.details, null, 2);
+      }
+
+      const sanitizedContent = this.dataSanitizer.sanitize(content);
+
+      return {
+        filePath: `chrome-devtools://${log.type}/${log.timestamp}`,
+        content: sanitizedContent,
+        size: sanitizedContent.length,
+        lastModified: new Date(log.timestamp)
+      };
+    });
+  }
+
+  /**
+   * Helper to decode and parse JWT tokens.
+   * This is a basic decoder and does not verify the signature.
+   */
+  private parseJwt(token: string): JwtTokenDetails {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const decodedPayload = JSON.parse(Buffer.from(base64, 'base64').toString());
+      const header = JSON.parse(Buffer.from(token.split('.')[0], 'base64').toString());
+      
+      let expiresAt: string | undefined;
+      if (decodedPayload.exp) {
+        expiresAt = new Date(decodedPayload.exp * 1000).toISOString();
+      }
+
+      let issuedAt: string | undefined;
+      if (decodedPayload.iat) {
+        issuedAt = new Date(decodedPayload.iat * 1000).toISOString();
+      }
+
+      return {
+        token,
+        decodedPayload,
+        header,
+        signatureVerified: false, // Cannot verify signature without key
+        expiresAt,
+        issuedAt
+      };
+    } catch (error) {
+      logger.warn('Failed to parse JWT token', { token, error });
+      return { token, signatureVerified: false };
+    }
   }
 
   async extract(targetId?: string): Promise<ExtractedLog[]> {
     let client: CDPClient | undefined;
     let networkEnabled = false;
     let consoleEnabled = false;
+    let runtimeEnabled = false;
+    let websocketEnabled = false;
+    let jwtMonitoringEnabled = false;
+    let graphqlMonitoringEnabled = false;
+    let reduxMonitoringEnabled = false;
+    let performanceMonitoringEnabled = false;
+    let eventLoopMonitoringEnabled = false;
+    let userInteractionRecordingEnabled = false;
+    let domMutationMonitoringEnabled = false;
+    let cssChangeMonitoringEnabled = false;
     try {
       logger.info('Connecting to Chrome DevTools...', { options: this.options });
       
       let debuggerUrl: string;
+      if (this.options.headless) {
+        // In headless mode, we might need to launch Chrome ourselves.
+        // For simplicity, we'll assume a running instance for now, but this is where
+        // you would add logic to launch a headless chrome instance.
+        logger.info('Headless mode enabled, but auto-launch not implemented. Assuming running instance.');
+      }
+      
       if (targetId) {
         const targets = await this.getDebuggablePageTargets();
         const selectedTarget = targets.find(t => t.id === targetId);
         if (!selectedTarget) {
-          throw new Error(`Chrome target with ID '$ {targetId}' not found.`);
+          throw new Error(`Chrome target with ID '${targetId}' not found.`);
         }
         debuggerUrl = selectedTarget.webSocketDebuggerUrl;
       } else {
@@ -484,7 +803,7 @@ export class ChromeExtractor {
       client = await this.connectToDebugger(debuggerUrl);
       logger.info('Connected to Chrome');
 
-      const { Network, Console, Log } = client;
+      const { Network, Console, Log, Runtime, CSS, Performance } = client;
       const logs: CollectedLogEntry[] = [];
 
       // Helper function to convert Chrome timestamp to ISO string
@@ -566,6 +885,33 @@ export class ChromeExtractor {
               await client.Console.enable();
               await client.Log.enable();
             }
+            if (this.options.includeWebSockets) {
+              await client.Network.enable(); // Network domain is needed for WebSockets
+            }
+            if (this.options.includeJwtMonitoring) {
+              await client.Network.enable(); // Network domain is needed for JWT monitoring
+            }
+            if (this.options.includeGraphqlMonitoring) {
+              await client.Network.enable(); // Network domain is needed for GraphQL monitoring
+            }
+            if (this.options.includeReduxMonitoring) {
+              await client.Runtime.enable(); // Runtime domain is needed for Redux monitoring
+            }
+            if (this.options.includePerformanceMonitoring) {
+              await client.Performance.enable(); // Performance domain is needed for performance monitoring
+            }
+            if (this.options.includeEventLoopMonitoring) {
+              await client.Runtime.enable(); // Runtime domain is needed for Event Loop monitoring
+            }
+            if (this.options.includeUserInteractionRecording) {
+              await client.Runtime.enable();
+            }
+            if (this.options.includeDomMutationMonitoring) {
+              await client.Runtime.enable();
+            }
+            if (this.options.includeCssChangeMonitoring) {
+              await client.CSS.enable();
+            }
             
             isReconnecting = false;
             reconnectAttempts = 0;
@@ -580,6 +926,18 @@ export class ChromeExtractor {
           }
         }
       });
+
+      if (this.options.enableReactHookMonitoring) {
+        try {
+          await Runtime.enable();
+          await Runtime.evaluate({ expression: REACT_HOOK_MONITOR_SCRIPT, silent: true });
+          runtimeEnabled = true;
+          logger.info('React hooks monitoring script injected.');
+        } catch (error) {
+          logger.error('Failed to inject React hooks monitoring script', { error });
+          this.options.enableReactHookMonitoring = false;
+        }
+      }
 
       if (this.options.includeNetwork) {
         try {
@@ -606,25 +964,263 @@ export class ChromeExtractor {
           this.options.includeConsole = false; // Disable console tracking for this session
         }
       }
+      if (this.options.includeWebSockets) {
+        try {
+          await Network.enable();
+          websocketEnabled = true;
+          logger.info('WebSocket tracking enabled');
+        } catch (error) {
+          logger.error('Failed to enable Network domain for WebSocket tracking', { error });
+          this.options.includeWebSockets = false;
+        }
+      }
+      if (this.options.includeJwtMonitoring) {
+        try {
+          await Network.enable();
+          jwtMonitoringEnabled = true;
+          logger.info('JWT token monitoring enabled');
+        } catch (error) {
+          logger.error('Failed to enable Network domain for JWT monitoring', { error });
+          this.options.includeJwtMonitoring = false;
+        }
+      }
+      if (this.options.includeGraphqlMonitoring) {
+        try {
+          await Network.enable();
+          graphqlMonitoringEnabled = true;
+          logger.info('GraphQL monitoring enabled');
+        } catch (error) {
+          logger.error('Failed to enable Network domain for GraphQL monitoring', { error });
+          this.options.includeGraphqlMonitoring = false;
+        }
+      }
+      if (this.options.includeReduxMonitoring) {
+        try {
+          await Runtime.enable();
+          await Runtime.evaluate({ expression: REDUX_STATE_MONITOR_SCRIPT, silent: true });
+          reduxMonitoringEnabled = true;
+          logger.info('Redux state monitoring script injected.');
+        } catch (error) {
+          logger.error('Failed to inject Redux state monitoring script', { error });
+          this.options.includeReduxMonitoring = false;
+        }
+      }
+      if (this.options.includePerformanceMonitoring) {
+        try {
+          await Performance.enable();
+          performanceMonitoringEnabled = true;
+          logger.info('Performance monitoring enabled');
+        } catch (error) {
+          logger.error('Failed to enable Performance domain', { error });
+          this.options.includePerformanceMonitoring = false;
+        }
+      }
+      if (this.options.includeEventLoopMonitoring) {
+        try {
+          await Runtime.enable();
+          await Runtime.evaluate({ expression: EVENT_LOOP_MONITOR_SCRIPT, silent: true });
+          eventLoopMonitoringEnabled = true;
+          logger.info('Event loop monitoring script injected.');
+        } catch (error) {
+          logger.error('Failed to inject Event loop monitoring script', { error });
+          this.options.includeEventLoopMonitoring = false;
+        }
+      }
+      if (this.options.includeUserInteractionRecording) {
+        try {
+          await Runtime.enable();
+          await Runtime.evaluate({ expression: USER_INTERACTION_MONITOR_SCRIPT, silent: true });
+          userInteractionRecordingEnabled = true;
+          logger.info('User interaction recording script injected.');
+        } catch (error) {
+          logger.error('Failed to inject User interaction recording script', { error });
+          this.options.includeUserInteractionRecording = false;
+        }
+      }
+      if (this.options.includeDomMutationMonitoring) {
+        try {
+          await Runtime.enable();
+          await Runtime.evaluate({ expression: DOM_MUTATION_MONITOR_SCRIPT, silent: true });
+          domMutationMonitoringEnabled = true;
+          logger.info('DOM mutation monitoring script injected.');
+        } catch (error) {
+          logger.error('Failed to inject DOM mutation monitoring script', { error });
+          this.options.includeDomMutationMonitoring = false;
+        }
+      }
+      if (this.options.includeCssChangeMonitoring) {
+        try {
+          await CSS.enable();
+          cssChangeMonitoringEnabled = true;
+          logger.info('CSS change monitoring enabled.');
+        } catch (error) {
+          logger.error('Failed to enable CSS change monitoring', { error });
+          this.options.includeCssChangeMonitoring = false;
+        }
+      }
 
       // Set up event listeners
-      if (this.options.includeNetwork) {
-        Network.requestWillBeSent((params: NetworkRequest) => {
-          logger.debug('Network request detected', { url: params.url, details: params });
-          logs.push({
-            type: 'network',
-            timestamp: toISOString(params.timestamp),
-            details: params
-          });
+      if (this.options.includeNetwork || this.options.includeGraphqlMonitoring) {
+        Network.requestWillBeSent((params: any) => {
+          logger.debug('Network request detected', { url: params.request.url, details: params.request });
+          // Store the request for later correlation
+          this.pendingNetworkRequests.set(params.requestId, params.request);
+
+          // Check for JWT in request headers
+          if (this.options.includeJwtMonitoring && params.request.headers) {
+            for (const headerName in params.request.headers) {
+              if (headerName.toLowerCase() === 'authorization') {
+                const authHeader = params.request.headers[headerName];
+                if (authHeader.startsWith('Bearer ')) {
+                  const token = authHeader.substring(7);
+                  const jwtDetails = this.parseJwt(token);
+                  logs.push({
+                    type: 'jwt',
+                    timestamp: toISOString(params.timestamp),
+                    details: jwtDetails
+                  });
+                  logger.info('JWT token found in request', { token: jwtDetails.token });
+                } else if (authHeader.startsWith('Basic ')) {
+                  logs.push({
+                    type: 'credential',
+                    timestamp: toISOString(params.timestamp),
+                    details: { type: 'basicAuth', value: authHeader, source: 'header', key: headerName }
+                  });
+                  logger.info('Basic Auth credentials found in request header');
+                }
+              } else if (headerName.toLowerCase().includes('key') || headerName.toLowerCase().includes('token')) {
+                logs.push({
+                  type: 'credential',
+                  timestamp: toISOString(params.timestamp),
+                  details: { type: 'apiKey', value: params.request.headers[headerName], source: 'header', key: headerName }
+                });
+                logger.info('Potential API key/token found in request header', { key: headerName });
+              }
+            }
+          }
+
+          // Check for GraphQL in request
+          if (this.options.includeGraphqlMonitoring && params.method === 'POST' && params.request.postData) {
+            try {
+              const postData = JSON.parse(params.request.postData);
+              if (postData.query) {
+                // This is likely a GraphQL request
+                const graphqlEvent: GraphQLEvent = {
+                  requestId: params.requestId,
+                  url: params.request.url,
+                  requestBody: postData,
+                  graphqlQuery: postData.query,
+                  graphqlVariables: postData.variables,
+                  graphqlOperationName: postData.operationName,
+                  timestamp: params.timestamp,
+                  type: 'request'
+                };
+                logs.push({
+                  type: 'graphql',
+                  timestamp: toISOString(params.timestamp),
+                  details: graphqlEvent
+                });
+                this.pendingGraphqlRequests.set(params.requestId, params.request); // Store original request for response correlation
+                logger.info('GraphQL request detected', { url: params.request.url, query: postData.query });
+              }
+            } catch (e) {
+              // Not a JSON postData, or not a GraphQL query
+            }
+          }
         });
 
-        Network.responseReceived((params: NetworkResponse) => {
-          logger.debug('Network response detected', { status: params.status, details: params });
-          logs.push({
-            type: 'network',
-            timestamp: toISOString(params.timestamp),
-            details: params
-          });
+        Network.responseReceived((params: any) => {
+          logger.debug('Network response detected', { status: params.response.status, details: params.response });
+          const request = this.pendingNetworkRequests.get(params.requestId);
+          if (request) {
+            // Correlate request and response
+            const correlatedEntry: CorrelatedNetworkEntry = {
+              request: request,
+              response: params.response,
+            };
+            logs.push({
+              type: 'network',
+              timestamp: toISOString(params.timestamp),
+              details: correlatedEntry
+            });
+            // Remove from pending requests
+            this.pendingNetworkRequests.delete(params.requestId);
+          } else {
+            // If no matching request, log the response as is (e.g., from cache or already processed)
+            logger.warn('Received network response for unknown request', { requestId: params.requestId });
+            logs.push({
+              type: 'network',
+              timestamp: toISOString(params.timestamp),
+              details: params.response // Still push the raw response if unmatched
+            });
+          }
+
+          // Check for JWT in response headers (e.g., for new tokens or refresh tokens)
+          if (this.options.includeJwtMonitoring && params.response.headers) {
+            for (const headerName in params.response.headers) {
+              // Common headers for JWTs in responses might be 'Authorization', 'Set-Cookie' (if stored in cookie)
+              // For simplicity, we'll check 'Authorization' here, though 'Set-Cookie' would require more complex parsing.
+              if (headerName.toLowerCase() === 'authorization') {
+                const authHeader = params.response.headers[headerName];
+                if (authHeader.startsWith('Bearer ')) {
+                  const token = authHeader.substring(7);
+                  const jwtDetails = this.parseJwt(token);
+                  logs.push({
+                    type: 'jwt',
+                    timestamp: toISOString(params.timestamp),
+                    details: jwtDetails
+                  });
+                  logger.info('JWT token found in response', { token: jwtDetails.token });
+                } else if (authHeader.startsWith('Basic ')) {
+                  logs.push({
+                    type: 'credential',
+                    timestamp: toISOString(params.timestamp),
+                    details: { type: 'basicAuth', value: authHeader, source: 'header', key: headerName }
+                  });
+                  logger.info('Basic Auth credentials found in response header');
+                }
+              } else if (headerName.toLowerCase().includes('key') || headerName.toLowerCase().includes('token')) {
+                logs.push({
+                  type: 'credential',
+                  timestamp: toISOString(params.timestamp),
+                  details: { type: 'apiKey', value: params.response.headers[headerName], source: 'header', key: headerName }
+                });
+                logger.info('Potential API key/token found in response header', { key: headerName });
+              }
+            }
+          }
+
+          // Check for GraphQL response
+          if (this.options.includeGraphqlMonitoring && this.pendingGraphqlRequests.has(params.requestId)) {
+            const originalRequest = this.pendingGraphqlRequests.get(params.requestId);
+            if (originalRequest) {
+              // To get the response body, we need to call Network.getResponseBody
+              // This requires an additional CDP call and can be asynchronous.
+              // For simplicity in this step, we'll log what we have, and enhance later if needed.
+              // In a real scenario, you'd await Network.getResponseBody here.
+              logger.debug('Attempting to get GraphQL response body for', { requestId: params.requestId });
+
+              const graphqlEvent: GraphQLEvent = {
+                requestId: params.requestId,
+                url: originalRequest.url,
+                requestBody: originalRequest.postData ? JSON.parse(originalRequest.postData) : undefined,
+                responseBody: params.response, // Use params.response for response body
+                graphqlQuery: originalRequest.postData ? JSON.parse(originalRequest.postData).query : undefined,
+                graphqlVariables: originalRequest.postData ? JSON.parse(originalRequest.postData).variables : undefined,
+                graphqlOperationName: originalRequest.postData ? JSON.parse(originalRequest.postData).operationName : undefined,
+                errors: params.response.status >= 400 ? [{ message: `HTTP Error: ${params.response.status}` }] : undefined, // Use params.response.status
+                timestamp: params.timestamp,
+                type: 'response'
+              };
+              logs.push({
+                type: 'graphql',
+                timestamp: toISOString(params.timestamp),
+                details: graphqlEvent
+              });
+              this.pendingGraphqlRequests.delete(params.requestId);
+              logger.info('GraphQL response detected', { url: originalRequest.url, status: params.response.status });
+            }
+          }
         });
       }
 
@@ -680,6 +1276,133 @@ export class ChromeExtractor {
             type: 'log',
             timestamp: toISOString(params.timestamp),
             details: params
+          });
+        });
+      }
+      
+      if (this.options.includeWebSockets) {
+        Network.webSocketCreated((params: any) => {
+          logger.debug('WebSocket created', { url: params.url, requestId: params.requestId });
+          logs.push({
+            type: 'websocket',
+            timestamp: toISOString(params.timestamp),
+            details: { type: 'webSocketCreated', requestId: params.requestId, url: params.url, message: 'WebSocket created', timestamp: params.timestamp }
+          });
+        });
+
+        Network.webSocketClosed((params: any) => {
+          logger.debug('WebSocket closed', { requestId: params.requestId });
+          logs.push({
+            type: 'websocket',
+            timestamp: toISOString(params.timestamp),
+            details: { type: 'webSocketClosed', requestId: params.requestId, url: params.url, message: 'WebSocket closed', timestamp: params.timestamp }
+          });
+        });
+
+        Network.webSocketFrameSent((params: any) => {
+          logger.debug('WebSocket frame sent', { requestId: params.requestId, payloadData: params.response.payloadData });
+          logs.push({
+            type: 'websocket',
+            timestamp: toISOString(params.timestamp),
+            details: { type: 'webSocketFrameSent', requestId: params.requestId, url: params.url, frame: params.response, timestamp: params.timestamp }
+          });
+        });
+
+        Network.webSocketFrameReceived((params: any) => {
+          logger.debug('WebSocket frame received', { requestId: params.requestId, payloadData: params.response.payloadData });
+          logs.push({
+            type: 'websocket',
+            timestamp: toISOString(params.timestamp),
+            details: { type: 'webSocketFrameReceived', requestId: params.requestId, url: params.url, frame: params.response, timestamp: params.timestamp }
+          });
+        });
+      }
+
+      if (this.options.includePerformanceMonitoring) {
+        client.Performance.metrics((params: any) => {
+          // Filter for metrics that might indicate React rendering activity
+          // React uses User Timing API (performance.mark/measure) in dev mode.
+          // These appear as metrics with specific names.
+          for (const metric of params.metrics) {
+            // Common metrics that could be related to rendering or scripting performance
+            if (
+              metric.name === 'ScriptDuration' || 
+              metric.name === 'LayoutDuration' ||
+              metric.name === 'RecalculateStyleDuration' ||
+              metric.name === 'TaskDuration' ||
+              metric.name === 'V8.GC.BackgroundIdleNotification' || // Garbage collection
+              metric.name === 'V8.GC.AtomicPause' || // Garbage collection
+              metric.name.startsWith('TaskQueueManager::') || // Tasks related to main thread
+              metric.name.startsWith('Commit') || // Commit events in rendering
+              metric.name.startsWith('Update') || // Update events in rendering
+              metric.name.startsWith('Layout') || // Layout events
+              metric.name.startsWith('RecalculateStyles') || // Style recalculations
+              // Memory metrics
+              metric.name === 'JSHeapUsedSize' || 
+              metric.name === 'JSHeapTotalSize' ||
+              metric.name === 'Nodes' ||
+              metric.name === 'Documents' ||
+              metric.name === 'Listeners' ||
+              metric.name === 'V8.Memory.AllocatedBytes' ||
+              metric.name === 'V8.Memory.TotalHeapSize'
+            ) {
+              logs.push({
+                type: 'performance',
+                timestamp: toISOString(params.title ? params.timestamp : Date.now() / 1000), // Use event timestamp or current time
+                details: {
+                  name: metric.name,
+                  value: metric.value,
+                  timestamp: params.timestamp,
+                  title: params.title,
+                }
+              });
+              logger.debug('Performance Metric detected', { name: metric.name, value: metric.value, title: params.title });
+            }
+
+            // Additionally, look for User Timing API marks and measures if React uses them
+            // React DevTools often reports these as 'Mark:<name>' or 'Measure:<name>'
+            if (metric.name.startsWith('Mark:') || metric.name.startsWith('Measure:')) {
+                logs.push({
+                  type: 'performance',
+                  timestamp: toISOString(params.title ? params.timestamp : Date.now() / 1000),
+                  details: {
+                    name: metric.name,
+                    value: metric.value,
+                    timestamp: params.timestamp,
+                    title: params.title,
+                  }
+                });
+                logger.debug('User Timing Performance Metric detected', { name: metric.name, value: metric.value, title: params.title });
+            }
+          }
+        });
+      }
+
+      if (this.options.includeCssChangeMonitoring) {
+        client.CSS.stylesheetAdded((params: any) => {
+          logger.debug('Stylesheet added', { header: params.header });
+          logs.push({
+            type: 'csschange',
+            timestamp: toISOString(Date.now() / 1000), // CDP event doesn't have a timestamp
+            details: { type: 'stylesheetAdded', styleSheetId: params.header.styleSheetId, header: params.header, timestamp: Date.now() }
+          });
+        });
+
+        client.CSS.stylesheetRemoved((params: any) => {
+          logger.debug('Stylesheet removed', { styleSheetId: params.styleSheetId });
+          logs.push({
+            type: 'csschange',
+            timestamp: toISOString(Date.now() / 1000),
+            details: { type: 'stylesheetRemoved', styleSheetId: params.styleSheetId, timestamp: Date.now() }
+          });
+        });
+
+        client.CSS.stylesheetChanged((params: any) => {
+          logger.debug('Stylesheet changed', { styleSheetId: params.styleSheetId });
+          logs.push({
+            type: 'csschange',
+            timestamp: toISOString(Date.now() / 1000),
+            details: { type: 'stylesheetChanged', styleSheetId: params.styleSheetId, change: params, timestamp: Date.now() }
           });
         });
       }
@@ -749,6 +1472,59 @@ export class ChromeExtractor {
           if (consoleEnabled && client.Log?.disable) {
             await client.Log.disable();
           }
+          if (runtimeEnabled && client.Runtime?.disable) {
+            await client.Runtime.disable();
+          }
+          if (websocketEnabled && client.Network?.disable) { // Network domain might already be disabled if includeNetwork was false
+            // Only disable if network was enabled purely for websockets
+            if (!this.options.includeNetwork) {
+              await client.Network.disable();
+            }
+          }
+          if (jwtMonitoringEnabled && client.Network?.disable) {
+            // Only disable if network was enabled purely for JWT monitoring
+            if (!this.options.includeNetwork && !this.options.includeWebSockets) {
+              await client.Network.disable();
+            }
+          }
+          if (graphqlMonitoringEnabled && client.Network?.disable) {
+            // Only disable if network was enabled purely for GraphQL monitoring
+            if (!this.options.includeNetwork && !this.options.includeWebSockets && !this.options.includeJwtMonitoring) {
+              await client.Network.disable();
+            }
+          }
+          if (reduxMonitoringEnabled && client.Runtime?.disable) {
+            // Only disable if runtime was enabled purely for Redux monitoring
+            if (!this.options.enableReactHookMonitoring) {
+              await client.Runtime.disable();
+            }
+          }
+          if (performanceMonitoringEnabled && client.Performance?.disable) {
+            await client.Performance.disable();
+          }
+          if (eventLoopMonitoringEnabled && client.Runtime?.disable) {
+            // Only disable if runtime was enabled purely for event loop monitoring
+            if (!this.options.enableReactHookMonitoring && !this.options.includeReduxMonitoring) {
+              await client.Runtime.disable();
+            }
+          }
+          if (userInteractionRecordingEnabled && client.Runtime?.disable) {
+            // Only disable if runtime was enabled purely for user interaction recording
+            if (!this.options.enableReactHookMonitoring && !this.options.includeReduxMonitoring && !this.options.includeEventLoopMonitoring) {
+              await client.Runtime.disable();
+            }
+          }
+          if (domMutationMonitoringEnabled && client.Runtime?.disable) {
+            if (!this.options.enableReactHookMonitoring && !this.options.includeReduxMonitoring && !this.options.includeEventLoopMonitoring && !this.options.includeUserInteractionRecording) {
+              await client.Runtime.disable();
+            }
+          }
+          if (cssChangeMonitoringEnabled && client.CSS?.disable) {
+            await client.CSS.disable();
+          }
+          // Clear any pending requests on cleanup
+          this.pendingNetworkRequests.clear();
+          this.pendingGraphqlRequests.clear();
           await client.close();
         } catch (cleanupError) {
           logger.warn('Error during Chrome DevTools cleanup', { cleanupError });

@@ -5,6 +5,7 @@ import { createLogger, format, transports } from 'winston';
 import { glob } from 'glob';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
+import DailyRotateFile from 'winston-daily-rotate-file';
 
 // Configure logger
 const logger = createLogger({
@@ -19,6 +20,13 @@ const logger = createLogger({
         format.colorize(),
         format.simple()
       )
+    }),
+    new DailyRotateFile({
+      filename: 'application-%DATE%.log',
+      datePattern: 'YYYY-MM-DD-HH',
+      zippedArchive: true,
+      maxSize: '20m',
+      maxFiles: '14d'
     })
   ]
 });

@@ -1,11 +1,9 @@
-/// <reference types="vitest" />
 import { ChromeExtractor } from '../chrome-extractor.js';
 import CDP from 'chrome-remote-interface';
 import fetch, { Response, Headers } from 'node-fetch';
-import { describe, it, expect, beforeEach, afterEach, vi, SpyInstance } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { ConsoleMessage, DevToolsLogEntry, NetworkRequest, NetworkResponse } from '../types/chrome-types.js';
 import type { ExtractedLog } from '../types/extractor.js';
-import type { CDPClient } from 'chrome-remote-interface';
 
 // Ensure we're using mocks in CI environment
 if (process.env.CI || process.env.CHROME_TEST_MODE === 'mock') {
@@ -81,6 +79,23 @@ interface MockCDPClient {
     disable: ReturnType<typeof vi.fn<[], Promise<void>>>;
     entryAdded: ReturnType<typeof vi.fn<[], void>>;
   };
+  Runtime: {
+    enable: ReturnType<typeof vi.fn<[], Promise<void>>>;
+    disable: ReturnType<typeof vi.fn<[], Promise<void>>>;
+    evaluate: ReturnType<typeof vi.fn<[], Promise<any>>>;
+  };
+  Performance: {
+    enable: ReturnType<typeof vi.fn<[], Promise<void>>>;
+    disable: ReturnType<typeof vi.fn<[], Promise<void>>>;
+    metrics: ReturnType<typeof vi.fn<[], void>>;
+  };
+  CSS: {
+    enable: ReturnType<typeof vi.fn<[], Promise<void>>>;
+    disable: ReturnType<typeof vi.fn<[], Promise<void>>>;
+    stylesheetAdded: ReturnType<typeof vi.fn<[], void>>;
+    stylesheetRemoved: ReturnType<typeof vi.fn<[], void>>;
+    stylesheetChanged: ReturnType<typeof vi.fn<[], void>>;
+  };
   close: ReturnType<typeof vi.fn<[], Promise<void>>>;
   on: ReturnType<typeof vi.fn<[event: string, callback: (data: unknown) => void], void>>;
 }
@@ -132,6 +147,23 @@ describe('ChromeExtractor', () => {
         enable: vi.fn().mockResolvedValue(undefined),
         disable: vi.fn().mockResolvedValue(undefined),
         entryAdded: vi.fn()
+      },
+      Runtime: {
+        enable: vi.fn().mockResolvedValue(undefined),
+        disable: vi.fn().mockResolvedValue(undefined),
+        evaluate: vi.fn().mockResolvedValue(undefined)
+      },
+      Performance: {
+        enable: vi.fn().mockResolvedValue(undefined),
+        disable: vi.fn().mockResolvedValue(undefined),
+        metrics: vi.fn()
+      },
+      CSS: {
+        enable: vi.fn().mockResolvedValue(undefined),
+        disable: vi.fn().mockResolvedValue(undefined),
+        stylesheetAdded: vi.fn(),
+        stylesheetRemoved: vi.fn(),
+        stylesheetChanged: vi.fn()
       },
       close: vi.fn().mockResolvedValue(undefined),
       on: vi.fn()
@@ -267,6 +299,192 @@ describe('ChromeExtractor', () => {
     });
   });
 
+  describe('React Hook Monitoring', () => {
+    it('should correctly process console logs from React hooks', async () => {
+      extractor = new TestableChromeExtractor({
+        enableReactHookMonitoring: true,
+      });
+
+      const promise = extractor.extract();
+
+      // Simulate console logs from the hook monitor script
+      const consoleCallback = mockClient.on.mock.calls.find(call => call[0] === 'Console.messageAdded')?.[1];
+      if (consoleCallback) {
+        consoleCallback({
+          message: {
+            level: 'log',
+            text: "[CLiTS-React-Monitor] useState called",
+            parameters: [{ type: 'object', value: { initialValue: 0, currentValue: 0 } }],
+            timestamp: Date.now()
+          }
+        });
+        consoleCallback({
+          message: {
+            level: 'log',
+            text: "[CLiTS-React-Monitor] useEffect called",
+            parameters: [{ type: 'object', value: { dependencies: [] } }],
+            timestamp: Date.now()
+          }
+        });
+      }
+
+      vi.advanceTimersByTime(15000);
+      await vi.runAllTimersAsync();
+      const logs = await promise;
+
+      // This is a basic check. In a real scenario, you'd parse the log text
+      // and assert on the structured data. For now, we just check that console logs are captured.
+      const consoleLogs = logs.filter(log => log.filePath.startsWith('chrome-devtools://console'));
+      expect(consoleLogs.length).toBeGreaterThan(0);
+      expect(consoleLogs.some(log => log.content.includes('[CLiTS-React-Monitor] useState called'))).toBe(true);
+      expect(consoleLogs.some(log => log.content.includes('[CLiTS-React-Monitor] useEffect called'))).toBe(true);
+    });
+  });
+
+  describe('DOM Mutation Monitoring', () => {
+    it('should correctly process console logs from DOM mutations', async () => {
+      extractor = new TestableChromeExtractor({
+        includeDomMutationMonitoring: true,
+      });
+
+      const promise = extractor.extract();
+
+      // Simulate a DOM mutation log
+      const consoleCallback = mockClient.on.mock.calls.find(call => call[0] === 'Console.messageAdded')?.[1];
+      if (consoleCallback) {
+        consoleCallback({
+          message: {
+            level: 'log',
+            text: "[CLiTS-DOM-Monitor] DOM Mutation:",
+            parameters: [{ type: 'object', value: { type: 'attributes', target: 'DIV' } }],
+            timestamp: Date.now()
+          }
+        });
+      }
+
+      vi.advanceTimersByTime(15000);
+      await vi.runAllTimersAsync();
+      const logs = await promise;
+
+      const domMutationLogs = logs.filter(log => log.filePath.startsWith('chrome-devtools://console'));
+      expect(domMutationLogs.some(log => log.content.includes('[CLiTS-DOM-Monitor] DOM Mutation:'))).toBe(true);
+    });
+  });
+
+  describe('CSS Change Monitoring', () => {
+    it('should correctly process CSS change events', async () => {
+      extractor = new TestableChromeExtractor({
+        includeCssChangeMonitoring: true,
+      });
+
+      const promise = extractor.extract();
+
+      // Simulate a CSS change log
+      const cssCallback = mockClient.on.mock.calls.find(call => call[0] === 'CSS.stylesheetAdded')?.[1];
+      if (cssCallback) {
+        cssCallback({
+          header: { styleSheetId: '1', origin: 'regular', sourceURL: 'style.css' }
+        });
+      }
+
+      vi.advanceTimersByTime(15000);
+      await vi.runAllTimersAsync();
+      const logs = await promise;
+
+      const cssChangeLogs = logs.filter(log => log.filePath.startsWith('chrome-devtools://csschange'));
+      expect(cssChangeLogs.length).toBeGreaterThan(0);
+      expect(cssChangeLogs[0].content).toContain('stylesheetAdded');
+    });
+  });
+
+  describe('Redux State Monitoring', () => {
+    it('should correctly process console logs from Redux actions', async () => {
+      extractor = new TestableChromeExtractor({
+        includeReduxMonitoring: true,
+      });
+
+      const promise = extractor.extract();
+
+      // Simulate a Redux action log
+      const consoleCallback = mockClient.on.mock.calls.find(call => call[0] === 'Console.messageAdded')?.[1];
+      if (consoleCallback) {
+        consoleCallback({
+          message: {
+            level: 'log',
+            text: "[CLiTS-Redux-Monitor] Redux action dispatched:",
+            parameters: [{ type: 'object', value: { action: { type: 'TEST_ACTION' } } }],
+            timestamp: Date.now()
+          }
+        });
+      }
+
+      vi.advanceTimersByTime(15000);
+      await vi.runAllTimersAsync();
+      const logs = await promise;
+
+      const reduxLogs = logs.filter(log => log.filePath.startsWith('chrome-devtools://console'));
+      expect(reduxLogs.some(log => log.content.includes('[CLiTS-Redux-Monitor] Redux action dispatched:'))).toBe(true);
+    });
+  });
+
+  describe('Event Loop Monitoring', () => {
+    it('should correctly process long animation frame events', async () => {
+      extractor = new TestableChromeExtractor({
+        includeEventLoopMonitoring: true,
+      });
+
+      const promise = extractor.extract();
+      
+      const consoleCallback = mockClient.on.mock.calls.find(call => call[0] === 'Console.messageAdded')?.[1];
+      if (consoleCallback) {
+        consoleCallback({
+            message: {
+                level: 'log',
+                text: "[CLiTS-EventLoop-Monitor] Long Animation Frame detected:",
+                parameters: [{type: 'object', value: {duration: 60, blockingDuration: 10}}],
+                timestamp: Date.now()
+            }
+        });
+      }
+
+      vi.advanceTimersByTime(15000);
+      await vi.runAllTimersAsync();
+      const logs = await promise;
+
+      const eventLoopLogs = logs.filter(log => log.filePath.startsWith('chrome-devtools://console'));
+      expect(eventLoopLogs.some(log => log.content.includes('[CLiTS-EventLoop-Monitor] Long Animation Frame detected:'))).toBe(true);
+    });
+  });
+
+  describe('User Interaction Recording', () => {
+    it('should correctly process user interaction events', async () => {
+        extractor = new TestableChromeExtractor({
+            includeUserInteractionRecording: true,
+        });
+
+        const promise = extractor.extract();
+
+        const consoleCallback = mockClient.on.mock.calls.find(call => call[0] === 'Console.messageAdded')?.[1];
+        if (consoleCallback) {
+            consoleCallback({
+                message: {
+                    level: 'log',
+                    text: "[CLiTS-Interaction-Monitor] click event:",
+                    parameters: [{type: 'object', value: {target: 'BUTTON#my-button'}}],
+                    timestamp: Date.now()
+                }
+            });
+        }
+
+        vi.advanceTimersByTime(15000);
+        await vi.runAllTimersAsync();
+        const logs = await promise;
+
+        const interactionLogs = logs.filter(log => log.filePath.startsWith('chrome-devtools://console'));
+        expect(interactionLogs.some(log => log.content.includes('[CLiTS-Interaction-Monitor] click event:'))).toBe(true);
+    });
+  });
+
   describe('Cleanup', () => {
     it('should properly clean up resources on success', async () => {
       // Mock successful connection
@@ -286,6 +504,23 @@ describe('ChromeExtractor', () => {
           enable: vi.fn(),
           disable: vi.fn(),
           entryAdded: vi.fn()
+        },
+        Runtime: {
+          enable: vi.fn(),
+          disable: vi.fn(),
+          evaluate: vi.fn()
+        },
+        Performance: {
+          enable: vi.fn(),
+          disable: vi.fn(),
+          metrics: vi.fn()
+        },
+        CSS: {
+          enable: vi.fn(),
+          disable: vi.fn(),
+          stylesheetAdded: vi.fn(),
+          stylesheetRemoved: vi.fn(),
+          stylesheetChanged: vi.fn()
         },
         close: vi.fn(),
         on: vi.fn()
@@ -312,6 +547,9 @@ describe('ChromeExtractor', () => {
       expect(mockClient.Network.disable).toHaveBeenCalled();
       expect(mockClient.Console.disable).toHaveBeenCalled();
       expect(mockClient.Log.disable).toHaveBeenCalled();
+      expect(mockClient.Runtime.disable).toHaveBeenCalled();
+      expect(mockClient.Performance.disable).toHaveBeenCalled();
+      expect(mockClient.CSS.disable).toHaveBeenCalled();
       expect(mockClient.close).toHaveBeenCalled();
     }, 20000);
 
@@ -330,9 +568,26 @@ describe('ChromeExtractor', () => {
           messageAdded: vi.fn()
         },
         Log: {
-          enable: vi.fn(),
+          enable: vi.fn().mockRejectedValue(new Error('Log enable failed')),
           disable: vi.fn(),
           entryAdded: vi.fn()
+        },
+        Runtime: {
+          enable: vi.fn(),
+          disable: vi.fn(),
+          evaluate: vi.fn()
+        },
+        Performance: {
+          enable: vi.fn(),
+          disable: vi.fn(),
+          metrics: vi.fn()
+        },
+        CSS: {
+          enable: vi.fn(),
+          disable: vi.fn(),
+          stylesheetAdded: vi.fn(),
+          stylesheetRemoved: vi.fn(),
+          stylesheetChanged: vi.fn()
         },
         close: vi.fn(),
         on: vi.fn()
