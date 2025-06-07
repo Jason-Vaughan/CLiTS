@@ -3,14 +3,13 @@
 // BSD: Entry point for the CLiTS-INSPECTOR CLI tool. Handles command-line arguments and orchestrates log/data extraction.
 
 import { Command } from 'commander';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
 import { readFileSync } from 'fs';
-import { chromium } from 'playwright';
+import { PathResolver } from './utils/path-resolver.js';
+import { ChromeExtractor } from './chrome-extractor.js';
+import inquirer from 'inquirer';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const packageJson = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8'));
+const pathResolver = PathResolver.getInstance();
+const packageJson = JSON.parse(readFileSync(pathResolver.resolvePath('package.json'), 'utf8'));
 
 const program = new Command();
 
@@ -45,153 +44,99 @@ async function main(): Promise<void> {
     .option('--error-summary', 'Include summary statistics of error frequencies')
     .option('--live-mode [duration]', 'Run in live mode for specified duration in seconds', '60')
     .option('--interactive-login', 'Use interactive wizard for Chrome inspection')
+    .option('--target-id <id>', 'Specify a Chrome tab/page target ID to connect to')
     .action(async (options) => {
       try {
         // Chrome DevTools extraction
         if (options.chrome) {
-          // Check if Chrome is running with remote debugging
-          const http = await import('http');
-          await new Promise((resolve, reject) => {
-            const req = http.request({ 
-              hostname: options.chromeHost, 
-              port: parseInt(options.chromePort), 
-              path: '/json/version', 
-              timeout: 2000 
-            }, res => {
-              if (res.statusCode === 200) resolve(true);
-              else reject(new Error(`Chrome is not running with remote debugging enabled on ${options.chromeHost}:${options.chromePort}.`));
-            });
-            req.on('error', () => reject(new Error(`Chrome is not running with remote debugging enabled on ${options.chromeHost}:${options.chromePort}.`)));
-            req.end();
-          }).catch(() => {
-            console.error(`[CLiTS-INSPECTOR] Error: Chrome must be started with --remote-debugging-port=${options.chromePort} for --chrome or --interactive-login.`);
-            process.exit(1);
+          const chromeExtractor = new ChromeExtractor({
+            port: parseInt(options.chromePort),
+            host: options.chromeHost,
+            includeNetwork: options.network !== false,
+            includeConsole: options.console !== false,
+            filters: {
+              logLevels: options.logLevels?.split(',') as any[],
+              sources: options.sources?.split(',') as any[],
+              domains: options.domains?.split(','),
+              keywords: options.keywords?.split(','),
+              excludePatterns: options.exclude?.split(','),
+            },
+            format: {
+              groupBySource: options.groupBySource,
+              groupByLevel: options.groupByLevel,
+              includeTimestamp: options.noTimestamps !== true,
+              includeStackTrace: options.noStackTraces !== true,
+            },
+            reconnect: {
+              enabled: true, // Always enable reconnection for CLI usage
+              maxAttempts: 5,
+              delayBetweenAttemptsMs: 2000,
+            },
           });
 
-          // Connect to Chrome and collect logs
-          const browser = await chromium.connectOverCDP(`http://${options.chromeHost}:${options.chromePort}`);
-          const context = browser.contexts()[0];
-          const page = context.pages()[0] || await context.newPage();
-          
-          if (options.interactiveLogin) {
-            const timeoutSeconds = 30;
-            console.log(`\n[CLiTS-INSPECTOR] Please open Chrome and log in to the website you want to test.`);
-            console.log(`[CLiTS-INSPECTOR] You have ${timeoutSeconds} seconds to log in, or the process will exit.`);
-            console.log('[CLiTS-INSPECTOR] Press Enter when ready to continue...\n');
+          let targetId: string | undefined = options.targetId;
 
-            let timeLeft = timeoutSeconds;
-            const interval = setInterval(() => {
-              process.stdout.write(`\r[CLiTS-INSPECTOR] Time remaining: ${timeLeft} seconds...`);
-              timeLeft--;
-              if (timeLeft < 0) {
-                clearInterval(interval);
-                console.log('\n[CLiTS-INSPECTOR] Login timeout reached. Exiting...');
-                process.exit(1);
-              }
-            }, 1000);
+          if (!targetId) {
+            const targets = await chromeExtractor.getDebuggablePageTargets();
+            if (targets.length === 0) {
+              console.error('Error: No debuggable Chrome tabs found. Please open a new tab in Chrome running with --remote-debugging-port=9222');
+              process.exit(1);
+            } else if (targets.length === 1) {
+              targetId = targets[0].id;
+              console.log(`Automatically selected target: ${targets[0].title || targets[0].url}`);
+            } else {
+              const choices = targets.map((t, index) => ({
+                name: `[${index + 1}] ${t.title || t.url} (ID: ${t.id})`,
+                value: t.id,
+              }));
 
-            await new Promise(resolve => {
-              process.stdin.once('data', () => {
-                clearInterval(interval);
-                process.stdout.write('\n');
-                resolve(undefined);
-              });
-            });
-          }
-          
-          console.log('[CLiTS-INSPECTOR] Connected to Chrome, collecting logs...');
-          
-          // Start live mode with countdown
-          const liveModeSeconds = 60;
-          console.log(`[CLiTS-INSPECTOR] Running in live mode for ${liveModeSeconds} seconds...`);
-          let liveTimeLeft = liveModeSeconds;
-          const liveInterval = setInterval(() => {
-            process.stdout.write(`\r[CLiTS-INSPECTOR] Live mode time remaining: ${liveTimeLeft} seconds...`);
-            liveTimeLeft--;
-            if (liveTimeLeft < 0) {
-              clearInterval(liveInterval);
-              console.log('\n[CLiTS-INSPECTOR] Live mode completed. Exiting...');
-              process.exit(0);
+              const answer = await inquirer.prompt([
+                {
+                  type: 'list',
+                  name: 'selectedTargetId',
+                  message: 'Multiple debuggable Chrome tabs found. Please select one:',
+                  choices: choices,
+                },
+              ]);
+              targetId = answer.selectedTargetId;
             }
-          }, 1000);
-
-          // Collect console messages if enabled
-          if (options.console !== false) {
-            page.on('console', (msg: any) => {
-              const logLevel = msg.type();
-              if (options.logLevels && !options.logLevels.split(',').includes(logLevel)) {
-                return;
-              }
-              console.log(`[CLiTS-INSPECTOR][CONSOLE][${logLevel}]`, msg.text());
-            });
-          }
-
-          // Collect network requests and responses if enabled
-          if (options.network !== false) {
-            page.on('request', (request: any) => {
-              const requestData = {
-                url: request.url(),
-                method: request.method(),
-                headers: request.headers(),
-                postData: request.postData(),
-                resourceType: request.resourceType(),
-              };
-              
-              // Apply domain and keyword filters
-              if (options.domains) {
-                const domains = options.domains.split(',');
-                if (!domains.some((domain: string) => request.url().includes(domain))) {
-                  return;
-                }
-              }
-              
-              if (options.keywords) {
-                const keywords = options.keywords.split(',');
-                const requestStr = JSON.stringify(requestData);
-                if (!keywords.some((keyword: string) => requestStr.includes(keyword))) {
-                  return;
-                }
-              }
-              
-              console.log(`[CLiTS-INSPECTOR][NETWORK][REQUEST]`, JSON.stringify(requestData));
-            });
-          }
-
-          // Wait for page to be ready
-          try {
-            await page.waitForLoadState('networkidle', { timeout: 5000 });
-            const dom = await page.content();
-            console.log('[CLiTS-INSPECTOR][DOM]', dom.slice(0, 5000)); // limit output size
-          } catch (error: any) {
-            console.log('[CLiTS-INSPECTOR][WARNING] Could not capture DOM content:', error.message);
           }
           
-          // Keep collecting logs for specified duration in live mode
-          if (options.liveMode) {
-            const duration = parseInt(options.liveMode) * 1000;
-            console.log(`[CLiTS-INSPECTOR] Running in live mode for ${options.liveMode} seconds...`);
-            await new Promise(resolve => setTimeout(resolve, duration));
-          } else {
-            // Default collection period
-            await new Promise(resolve => setTimeout(resolve, 5000));
+          if (!targetId) {
+            console.error('Error: No Chrome target selected.');
+            process.exit(1);
           }
-          
-          console.log('[CLiTS-INSPECTOR] Finished collecting logs.');
-          await browser.close();
+
+          console.log('[CLiTS-INSPECTOR] Starting Chrome DevTools extraction...');
+          const extractedLogs = await chromeExtractor.extract(targetId);
+          console.log(JSON.stringify(extractedLogs, null, 2));
           return;
         }
 
         // File system extraction
         if (options.source) {
+          const { exists, error } = pathResolver.validatePath(options.source);
+          if (!exists) {
+            console.error(`[CLiTS-INSPECTOR] Error: Invalid source path. ${error}. Please ensure the path is correct and accessible.`);
+            process.exit(1);
+          }
           console.log(`Extracting logs from ${options.source}...`);
           // TODO: Implement file system extraction
           return;
         }
 
-        console.error('Error: No extraction source specified. Use --source for files or --chrome for Chrome DevTools');
+        console.error('[CLiTS-INSPECTOR] Error: No extraction source specified. Use --source for files or --chrome for Chrome DevTools.');
         process.exit(1);
       } catch (error) {
-        console.error('Error:', error);
+        if (error instanceof Error) {
+          console.error(`[CLiTS-INSPECTOR] An error occurred during extraction: ${error.message}`);
+          // Add more specific error handling here if needed
+          if (error.message.includes('Chrome target with ID') || error.message.includes('No debuggable Chrome tabs found')) {
+            console.error('[CLiTS-INSPECTOR] Please ensure Chrome is running with remote debugging enabled (--remote-debugging-port=9222) and a debuggable tab is open.');
+          }
+        } else {
+          console.error(`[CLiTS-INSPECTOR] An unexpected error occurred: ${String(error)}`);
+        }
         process.exit(1);
       }
     });
@@ -200,6 +145,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error) => {
-  console.error('Fatal error:', error);
+  console.error('[CLiTS-INSPECTOR] A fatal error occurred outside the command handler:', error);
   process.exit(1);
 }); 

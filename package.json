@@ -37,7 +37,7 @@
     "lint:fix": "eslint src --ext .ts --fix",
     "prepare": "npm run build",
     "prepublishOnly": "npm run test && npm run lint",
-    "test": "vitest run --exclude 'src/**/*.spec.ts' --exclude 'moveto_OnDeck/**/*'",
+    "test": "vitest run --exclude '{src/**/*.spec.ts,moveto_OnDeck/**/*}'",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "vitest run 'src/**/*.spec.ts'"

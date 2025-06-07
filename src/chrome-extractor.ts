@@ -137,18 +137,17 @@ export class ChromeExtractor {
     this.chromeErrorHandler = new ChromeErrorHandler(this.options.retryConfig);
   }
 
-  private async getDebuggerUrl(): Promise<string> {
+  public async getDebuggablePageTargets(): Promise<Array<{ id: string; url: string; title: string; webSocketDebuggerUrl: string; }>> {
     return this.chromeErrorHandler.executeWithRetry(async () => {
       try {
-        // First check if Chrome is running
         const versionResponse = await fetch(`http://${this.options.host}:${this.options.port}/json/version`);
         if (!versionResponse.ok) {
           throw new Error('Chrome is not running with remote debugging enabled. Start Chrome with --remote-debugging-port=9222');
         }
 
-        // Then get available targets
         const response = await fetch(`http://${this.options.host}:${this.options.port}/json/list`);
         const targets = await response.json() as Array<{
+          id: string;
           type: string;
           url: string;
           webSocketDebuggerUrl?: string;
@@ -157,26 +156,37 @@ export class ChromeExtractor {
 
         logger.info('Available targets', { targets: targets.map(t => ({ type: t.type, url: t.url, title: t.title })) });
 
-        // Find a suitable page target, preferring non-newtab pages
-        const pageTarget = targets.find(t => 
-          t.type === 'page' && !t.url.includes('chrome://newtab')
-        ) || targets.find(t => t.type === 'page');
+        const pageTargets = targets.filter(t => 
+          t.type === 'page' && t.webSocketDebuggerUrl
+        ).map(t => ({
+          id: t.id,
+          url: t.url,
+          title: t.title,
+          webSocketDebuggerUrl: t.webSocketDebuggerUrl as string,
+        }));
         
-        if (!pageTarget?.webSocketDebuggerUrl) {
-          logger.warn('No page target found. Please open a new tab in Chrome.');
+        if (pageTargets.length === 0) {
+          logger.warn('No debuggable page targets found. Please open a new tab in Chrome.');
           throw new Error('No debuggable Chrome tab found. Please open a new tab in Chrome running with --remote-debugging-port=9222');
         }
 
-        logger.info('Selected page target', { url: pageTarget.url, title: pageTarget.title });
-        return pageTarget.webSocketDebuggerUrl;
+        return pageTargets;
       } catch (error) {
         if (error instanceof Error) {
-          throw error;  // Re-throw our custom errors
+          throw error;
         }
-        logger.error('Failed to get Chrome debugger URL', { error });
+        logger.error('Failed to get Chrome debugger targets', { error });
         throw new Error(`Failed to connect to Chrome debugger: ${error instanceof Error ? error.message : String(error)}`);
       }
-    }, 'Getting Chrome debugger URL');
+    }, 'Getting Chrome debugger targets');
+  }
+
+  // This method is now private and should be called with a specific debugger URL
+  private async connectToDebugger(debuggerUrl: string): Promise<CDPClient> {
+    return this.chromeErrorHandler.executeWithRetry(
+      async () => CDP({ target: debuggerUrl }) as unknown as CDPClient,
+      'Connecting to Chrome DevTools'
+    );
   }
 
   private shouldIncludeLog(log: CollectedLogEntry): boolean {
@@ -444,20 +454,34 @@ export class ChromeExtractor {
     }));
   }
 
-  async extract(): Promise<ExtractedLog[]> {
+  async extract(targetId?: string): Promise<ExtractedLog[]> {
     let client: CDPClient | undefined;
     let networkEnabled = false;
     let consoleEnabled = false;
     try {
       logger.info('Connecting to Chrome DevTools...', { options: this.options });
       
-      const debuggerUrl = await this.getDebuggerUrl();
+      let debuggerUrl: string;
+      if (targetId) {
+        const targets = await this.getDebuggablePageTargets();
+        const selectedTarget = targets.find(t => t.id === targetId);
+        if (!selectedTarget) {
+          throw new Error(`Chrome target with ID '$ {targetId}' not found.`);
+        }
+        debuggerUrl = selectedTarget.webSocketDebuggerUrl;
+      } else {
+        // Fallback for direct CDP connection if no targetId is provided (e.g. for internal testing/direct usage)
+        const targets = await this.getDebuggablePageTargets();
+        if (targets.length === 0) {
+          throw new Error('No debuggable Chrome tabs found.');
+        }
+        debuggerUrl = targets[0].webSocketDebuggerUrl;
+        logger.warn('No specific target ID provided. Automatically selecting the first available page target.', { target: targets[0].url });
+      }
+
       logger.info('Got debugger URL', { debuggerUrl });
       
-      client = await this.chromeErrorHandler.executeWithRetry(
-        async () => CDP({ target: debuggerUrl }) as unknown as CDPClient,
-        'Connecting to Chrome DevTools'
-      );
+      client = await this.connectToDebugger(debuggerUrl);
       logger.info('Connected to Chrome');
 
       const { Network, Console, Log } = client;
@@ -506,26 +530,41 @@ export class ChromeExtractor {
             reconnectAttempts++;
             logger.info(`Attempting to reconnect (${reconnectAttempts}/${this.options.reconnect?.maxAttempts || 5})...`);
             
-            // Wait before attempting to reconnect
             await new Promise(resolve => setTimeout(resolve, this.options.reconnect?.delayBetweenAttemptsMs || 2000));
             
-            // Get a fresh debugger URL
-            const newDebuggerUrl = await this.getDebuggerUrl();
+            // Get a fresh debugger URL for the *same* target if possible
+            let newDebuggerUrl: string | undefined;
+            if (targetId) {
+              const newTargets = await this.getDebuggablePageTargets();
+              const reselectedTarget = newTargets.find(t => t.id === targetId);
+              if (reselectedTarget) {
+                newDebuggerUrl = reselectedTarget.webSocketDebuggerUrl;
+              }
+            } else {
+              // If no targetId was initially provided, try to find the first page again
+              const newTargets = await this.getDebuggablePageTargets();
+              if (newTargets.length > 0) {
+                newDebuggerUrl = newTargets[0].webSocketDebuggerUrl;
+              }
+            }
+
+            if (!newDebuggerUrl) {
+              logger.error('Could not find a valid debugger URL for reconnection.');
+              throw new Error('Could not find a valid debugger URL for reconnection.');
+            }
             
-            // Reconnect
             await client!.close();
             
-            // Use CDP directly with a callback
-            const newClient = await CDP({ target: newDebuggerUrl });
+            client = await this.connectToDebugger(newDebuggerUrl);
             logger.info('Reconnected to Chrome DevTools');
             
             // Re-enable required domains
             if (this.options.includeNetwork) {
-              await newClient.Network.enable();
+              await client.Network.enable();
             }
             if (this.options.includeConsole) {
-              await newClient.Console.enable();
-              await newClient.Log.enable();
+              await client.Console.enable();
+              await client.Log.enable();
             }
             
             isReconnecting = false;
@@ -543,15 +582,29 @@ export class ChromeExtractor {
       });
 
       if (this.options.includeNetwork) {
-        await Network.enable();
-        networkEnabled = true;
-        logger.info('Network tracking enabled');
+        try {
+          await Network.enable();
+          networkEnabled = true;
+          logger.info('Network tracking enabled');
+        } catch (error) {
+          logger.error('Failed to enable Network domain', { error });
+          // Decide on recovery action: e.g., continue without network logs, or re-throw if critical
+          // For now, we will log and continue without network logs
+          this.options.includeNetwork = false; // Disable network tracking for this session
+        }
       }
       if (this.options.includeConsole) {
-        await Console.enable();
-        await Log.enable();
-        consoleEnabled = true;
-        logger.info('Console tracking enabled');
+        try {
+          await Console.enable();
+          await Log.enable();
+          consoleEnabled = true;
+          logger.info('Console tracking enabled');
+        } catch (error) {
+          logger.error('Failed to enable Console/Log domain', { error });
+          // Decide on recovery action: e.g., continue without console logs, or re-throw if critical
+          // For now, we will log and continue without console logs
+          this.options.includeConsole = false; // Disable console tracking for this session
+        }
       }
 
       // Set up event listeners

@@ -64,6 +64,7 @@
 
 - **Node.js** >= 16
 - **Google Chrome** (latest recommended)
+- **inquirer** (for interactive prompts)
 - (Optional) [Playwright](https://playwright.dev/) for advanced automation
 
 ---
@@ -84,13 +85,13 @@ npm install -g clits
    ```
 2. **Run the generic website inspector:**
    ```sh
-   clits-inspect
+   clits extract --chrome --chrome-port 9222
    ```
-3. **Follow the interactive prompts:**
-   - Enter the website URL
-   - Choose whether to wait for login
-   - Complete login within 30 seconds if needed
-   - View the diagnostic output
+   *If multiple Chrome tabs are open, you will be prompted to select one.*
+   *Alternatively, specify a target ID directly:*
+   ```sh
+   clits extract --chrome --chrome-port 9222 --target-id <YOUR_TARGET_ID>
+   ```
 
 ---
 
@@ -103,10 +104,11 @@ Extract debugging data from files or a Chrome session.
 - `-s, --source <path>`: Source directory path for file extraction
 - `-p, --patterns <patterns...>`: Log file patterns to match (default: `['*.log']`)
 - `-m, --max-size <size>`: Maximum file size in MB (default: `10`)
-- `-n, --max-files <number>`: Maximum number of files to process (default: `100`)
-- `--chrome`: Extract logs from an existing Chrome session (must be started with `--remote-debugging-port=9222`)
+- `-f, --max-files <count>`: Maximum number of files to process (default: `100`)
+- `--chrome`: Extract logs from an existing Chrome session. This now includes improved connection stability, automatic reconnection, and interactive selection for multiple Chrome tabs (requires Chrome running with `--remote-debugging-port=9222`).
 - `--chrome-host <host>`: Chrome DevTools host (default: `localhost`)
 - `--chrome-port <port>`: Chrome DevTools port (default: `9222`)
+- `--target-id <id>`: Specify a Chrome tab/page target ID to connect to when using `--chrome`. If not provided and multiple targets are found, an interactive prompt will appear.
 - `--no-network`: Exclude network logs from Chrome DevTools
 - `--no-console`: Exclude console logs from Chrome DevTools
 - `--log-levels <levels>`: Filter by log levels (comma-separated, default: `error,warning,info,debug`)
@@ -121,7 +123,7 @@ Extract debugging data from files or a Chrome session.
 - `--output-file <path>`: Save logs to the specified file path
 - `--error-summary`: Include summary statistics of error frequencies
 - `--live-mode [duration]`: Run in live mode for specified duration in seconds (default: `60`)
-- `--interactive-login`: Pause and prompt for manual login before running browser automation
+- `--interactive-login`: This option is deprecated. Interactive login is now automatically handled if needed based on the selected Chrome tab.
 - `--no-login`: Bypass any login prompts and run automation as unauthenticated
 
 ### `clits-inspect`
@@ -160,46 +162,89 @@ The inspector outputs information in a structured format for easy AI parsing:
 
 ## For AI Assistants
 
-CLiTS is designed to be easily extended and automated. Here's how you can use it:
+CLiTS is designed to be easily extended and automated. Now that `ChromeExtractor` is central to Chrome interactions, here's an updated perspective:
 
-### Basic Usage
+### Basic Usage with `ChromeExtractor`
+For direct programmatic access (e.g., from an AI tool), you can instantiate and use `ChromeExtractor`:
+
 ```typescript
-import { chromium } from 'playwright';
+import { ChromeExtractor } from './src/chrome-extractor'; // Adjust path as needed
 
-async function inspect(url: string) {
-  const browser = await chromium.connectOverCDP('http://localhost:9222');
-  const page = browser.contexts()[0].pages()[0];
-  await page.goto(url);
-  // Add your custom inspection logic here
+async function extractChromeLogs(port: number, host: string, targetId?: string) {
+  const extractor = new ChromeExtractor({
+    port,
+    host,
+    includeNetwork: true,
+    includeConsole: true,
+    reconnect: { enabled: true, maxAttempts: 5 } // Reconnection enabled by default
+  });
+
+  try {
+    const logs = await extractor.extract(targetId);
+    console.log('Extracted logs:', JSON.stringify(logs, null, 2));
+    return logs;
+  } catch (error) {
+    console.error('Error during extraction:', error);
+    throw error;
+  }
 }
+
+// Example usage:
+// To get logs from the first available Chrome tab on port 9222
+// extractChromeLogs(9222, 'localhost');
+
+// To get logs from a specific target ID
+// extractChromeLogs(9222, 'localhost', 'YOUR_TARGET_ID');
 ```
 
-### Custom Automation
+### Retrieving and Selecting Targets Programmatically
+If you need to list and select Chrome tabs programmatically:
+
 ```typescript
-// Example: Automated login and inspection
-async function inspectWithLogin(url: string, username: string, password: string) {
-  const browser = await chromium.connectOverCDP('http://localhost:9222');
-  const page = browser.contexts()[0].pages()[0];
-  await page.goto(url);
-  
-  // Custom login logic
-  await page.fill('#username', username);
-  await page.fill('#password', password);
-  await page.click('#login-button');
-  
-  // Your custom inspection
-  const logs = await page.evaluate(() => console.logs);
-  console.log('[CLiTS-INSPECTOR][CUSTOM]', logs);
+import { ChromeExtractor } from './src/chrome-extractor'; // Adjust path as needed
+
+async function listAndSelectChromeTarget(port: number, host: string) {
+  const extractor = new ChromeExtractor({ port, host });
+  try {
+    const targets = await extractor.getDebuggablePageTargets();
+    if (targets.length === 0) {
+      console.log('No debuggable Chrome tabs found.');
+      return null;
+    }
+
+    console.log('Available Chrome tabs:');
+    targets.forEach((t, index) => {
+      console.log(`${index + 1}. ${t.title || t.url} (ID: ${t.id})`);
+    });
+
+    // For programmatic selection, you might choose the first target or apply custom logic
+    const selectedTarget = targets[0]; 
+    console.log(`Programmatically selected: ${selectedTarget.title || selectedTarget.url}`);
+    return selectedTarget.id;
+
+  } catch (error) {
+    console.error('Error listing Chrome targets:', error);
+    throw error;
+  }
 }
+
+// Example usage:
+// const selectedId = await listAndSelectChromeTarget(9222, 'localhost');
+// if (selectedId) {
+//   extractChromeLogs(9222, 'localhost', selectedId);
+// }
 ```
 
 ### Error Handling
+Error handling is now more robust within `ChromeExtractor`. Catched errors will typically provide detailed messages.
+
 ```typescript
 try {
-  await inspect('https://example.com');
+  // Your CLITS command or ChromeExtractor usage here
 } catch (error) {
   console.error('[CLiTS-INSPECTOR][ERROR]', error);
-  // Handle errors appropriately
+  // Errors from ChromeExtractor or the CLI will now provide more context.
+  // Example: if Chrome is not running, you'll get a specific message.
 }
 ```
 
