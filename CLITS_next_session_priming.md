@@ -64,8 +64,8 @@ Implementing improvements based on OnDeck's feedback, organized into phases, whi
   - [x] Data protection
 - [x] UI Interaction
   - [x] User interaction recording
-  - [ ] DOM mutation tracking
-  - [ ] CSS change monitoring
+  - [x] DOM mutation tracking
+  - [x] CSS change monitoring
 
 ### Phase 5 - Usability & Documentation (Pending)
 - [x] CLI Improvements
@@ -79,10 +79,10 @@ Implementing improvements based on OnDeck's feedback, organized into phases, whi
   - [x] Best practices
 
 ## Session Notes
-- Last completed task: All development phases completed.
-- Current focus: Project complete, ready for final review and NPM update.
-- Next steps: Next session will focus on NPM update and release preparation.
-- Blockers: None.
+- Last completed task: Attempted to fix test failures in `src/__tests__/chrome-extractor.test.ts` by refining event injection and updating type definitions, but tests are still failing.
+- Current focus: Resolving test failures to enable successful NPM package publication.
+- Next steps: Continue debugging and fixing the failing tests, focusing on the exact content and type of `ExtractedLog` and `CollectedLogEntry` objects, and ensuring the `formatLogs` method correctly processes and populates the `content` property for all new log types. Verify that `ChromeErrorHandler.executeWithRetry` is not inadvertently suppressing or modifying errors that should cause test failures.
+- Blockers: Failing tests preventing NPM publish.
 
 ## Compute Requirements
 - Recommended: High

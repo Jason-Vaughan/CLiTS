@@ -54,6 +54,12 @@
 
 - Generic website inspection with automatic log collection
 - Console, network, and DOM inspection
+- Advanced Logging (Structured logging with metadata, log rotation and size management, timestamp synchronization)
+- Component Monitoring (React hooks, lifecycle tracking, prop changes)
+- Network Analysis (Request/response correlation, WebSocket tracking, JWT token monitoring, GraphQL support)
+- State Management (Redux state visualization, state change tracking, middleware debugging)
+- Performance Monitoring (React render metrics, memory usage tracking, event loop monitoring)
+- UI Interaction (User interaction recording, DOM mutation tracking, CSS change monitoring)
 - Interactive login handling
 - AI-friendly output format
 - Extensible for custom automation
@@ -111,6 +117,21 @@ Extract debugging data from files or a Chrome session.
 - `--target-id <id>`: Specify a Chrome tab/page target ID to connect to when using `--chrome`. If not provided and multiple targets are found, an interactive prompt will appear.
 - `--no-network`: Exclude network logs from Chrome DevTools
 - `--no-console`: Exclude console logs from Chrome DevTools
+- `--include-react-hooks`: Include React hook monitoring
+- `--include-component-lifecycle`: Include React component lifecycle tracking
+- `--include-prop-changes`: Include React prop change monitoring
+- `--include-websockets`: Include WebSocket traffic monitoring
+- `--include-jwt-monitoring`: Include JWT token monitoring
+- `--include-graphql-monitoring`: Include GraphQL request/response monitoring
+- `--include-redux-monitoring`: Include Redux state monitoring
+- `--include-state-changes`: Include Redux state change tracking
+- `--include-middleware-debugging`: Include Redux middleware debugging
+- `--include-render-metrics`: Include React render metrics
+- `--include-memory-usage`: Include memory usage tracking
+- `--include-event-loop`: Include event loop monitoring
+- `--include-user-interaction`: Include user interaction recording
+- `--include-dom-mutation`: Include DOM mutation tracking
+- `--include-css-changes`: Include CSS change monitoring
 - `--log-levels <levels>`: Filter by log levels (comma-separated, default: `error,warning,info,debug`)
 - `--sources <sources>`: Filter by sources (comma-separated, default: `network,console,devtools`)
 - `--domains <domains>`: Filter by domain patterns (comma-separated)

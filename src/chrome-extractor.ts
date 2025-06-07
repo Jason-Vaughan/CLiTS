@@ -181,7 +181,7 @@ export interface ChromeExtractorOptions {
   };
   filters?: {
     logLevels?: Array<'error' | 'warning' | 'info' | 'debug'>;
-    sources?: Array<'network' | 'console' | 'devtools' | 'websocket' | 'jwt' | 'graphql' | 'redux' | 'performance' | 'eventloop' | 'userinteraction' | 'dommutation' | 'csschange'>;
+    sources?: Array<'network' | 'console' | 'devtools' | 'websocket' | 'jwt' | 'graphql' | 'redux' | 'performance' | 'eventloop' | 'userinteraction' | 'dommutation' | 'csschange' | 'reacthook'>;
     domains?: string[];  // Domain patterns to match (e.g. ["*.google.com", "api.*"])
     keywords?: string[]; // Keywords to match in log content
     excludePatterns?: string[]; // Regex patterns to exclude
@@ -207,9 +207,11 @@ export interface ChromeExtractorOptions {
   sanitizationRules?: SanitizationRule[];
 }
 
-interface CollectedLogEntry {
-  type: 'network' | 'console' | 'log' | 'websocket' | 'jwt' | 'graphql' | 'redux' | 'performance' | 'eventloop' | 'userinteraction' | 'dommutation' | 'csschange' | 'credential';
+export interface CollectedLogEntry {
+  type: 'network' | 'console' | 'log' | 'websocket' | 'jwt' | 'graphql' | 'redux' | 'performance' | 'eventloop' | 'userinteraction' | 'dommutation' | 'csschange' | 'credential' | 'reacthook';
   timestamp: string;
+  content?: string;
+  level?: string;
   details: NetworkRequest | NetworkResponse | ConsoleMessage | DevToolsLogEntry | CorrelatedNetworkEntry | WebSocketEvent | JwtTokenDetails | GraphQLEvent | ReduxEvent | PerformanceMetricEvent | EventLoopMetricEvent | UserInteractionEvent | DomMutationEvent | CssChangeEvent | CredentialDetails;
 }
 
@@ -239,7 +241,7 @@ export class ChromeExtractor {
       },
       filters: {
         logLevels: options.filters?.logLevels || ['error', 'warning', 'info', 'debug'],
-        sources: options.filters?.sources || ['network', 'console', 'devtools', 'websocket', 'jwt', 'graphql', 'redux', 'performance', 'eventloop', 'userinteraction', 'dommutation', 'csschange'],
+        sources: options.filters?.sources || ['network', 'console', 'devtools', 'websocket', 'jwt', 'graphql', 'redux', 'performance', 'eventloop', 'userinteraction', 'dommutation', 'csschange', 'reacthook'],
         domains: options.filters?.domains || [],
         keywords: options.filters?.keywords || [],
         excludePatterns: options.filters?.excludePatterns || [],
@@ -1522,10 +1524,12 @@ export class ChromeExtractor {
           if (cssChangeMonitoringEnabled && client.CSS?.disable) {
             await client.CSS.disable();
           }
-          // Clear any pending requests on cleanup
-          this.pendingNetworkRequests.clear();
-          this.pendingGraphqlRequests.clear();
+          // Disable Runtime if any monitoring scripts were injected
+          if (this.options.enableReactHookMonitoring || this.options.includeReduxMonitoring || this.options.includeEventLoopMonitoring || this.options.includeUserInteractionRecording || this.options.includeDomMutationMonitoring || this.options.includeCssChangeMonitoring) {
+            await client.Runtime.disable();
+          }
           await client.close();
+          logger.info('Chrome DevTools resources cleaned up.');
         } catch (cleanupError) {
           logger.warn('Error during Chrome DevTools cleanup', { cleanupError });
         }
@@ -1535,26 +1539,19 @@ export class ChromeExtractor {
 
   /**
    * Test hook: injects a simulated event into the log collection.
-   * @param type 'network' | 'console' | 'log'
+   * @param type 'network' | 'console' | 'log' | 'reacthook' | 'dommutation' | 'csschange' | 'redux' | 'eventloop' | 'userinteraction' | 'websocket' | 'jwt' | 'graphql' | 'performance' | 'credential'
    * @param payload The event payload (NetworkRequest, NetworkResponse, ConsoleMessage, DevToolsLogEntry)
    * @param logsOverride (optional) logs array to use (for test injection)
    */
   protected _injectTestEvent(
-    type: 'network' | 'console' | 'log',
+    type: 'network' | 'console' | 'log' | 'reacthook' | 'dommutation' | 'csschange' | 'redux' | 'eventloop' | 'userinteraction' | 'websocket' | 'jwt' | 'graphql' | 'performance' | 'credential',
     payload: any,
     logsOverride?: CollectedLogEntry[]
   ) {
+    const logs = logsOverride || (this as any).collectedLogs; // Use collectedLogs if no override
     const toISOString = (timestamp: number) => {
-      try {
-        if (!timestamp) return new Date().toISOString();
-        const ms = timestamp < 4102444800 ? timestamp * 1000 : timestamp;
-        if (isNaN(ms) || ms < 0 || ms > 9999999999999) return new Date().toISOString();
-        return new Date(ms).toISOString();
-      } catch {
-        return new Date().toISOString();
-      }
+      return new Date(timestamp).toISOString();
     };
-    const logs = logsOverride || (this as any)._testLogsArray || [];
     if (type === 'console') {
       // Suppression logic for console
       if (payload && typeof payload.text === 'string') {
@@ -1600,6 +1597,72 @@ export class ChromeExtractor {
     } else if (type === 'network') {
       logs.push({
         type,
+        timestamp: toISOString(payload.timestamp),
+        details: payload
+      });
+    } else if (type === 'reacthook') {
+      logs.push({
+        type: 'reacthook',
+        timestamp: toISOString(payload.timestamp),
+        details: payload
+      });
+    } else if (type === 'dommutation') {
+      logs.push({
+        type: 'dommutation',
+        timestamp: toISOString(payload.timestamp),
+        details: payload
+      });
+    } else if (type === 'csschange') {
+      logs.push({
+        type: 'csschange',
+        timestamp: toISOString(payload.timestamp),
+        details: payload
+      });
+    } else if (type === 'redux') {
+      logs.push({
+        type: 'redux',
+        timestamp: toISOString(payload.timestamp),
+        details: payload
+      });
+    } else if (type === 'eventloop') {
+      logs.push({
+        type: 'eventloop',
+        timestamp: toISOString(payload.timestamp),
+        details: payload
+      });
+    } else if (type === 'userinteraction') {
+      logs.push({
+        type: 'userinteraction',
+        timestamp: toISOString(payload.timestamp),
+        details: payload
+      });
+    } else if (type === 'websocket') {
+      logs.push({
+        type: 'websocket',
+        timestamp: toISOString(payload.timestamp),
+        details: payload
+      });
+    } else if (type === 'jwt') {
+      logs.push({
+        type: 'jwt',
+        timestamp: toISOString(payload.timestamp),
+        details: payload
+      });
+    } else if (type === 'graphql') {
+      logs.push({
+        type: 'graphql',
+        timestamp: toISOString(payload.timestamp),
+        details: payload
+      });
+    } else if (type === 'performance') {
+      logs.push({
+        type: 'performance',
+        timestamp: toISOString(payload.timestamp),
+        details: payload
+      });
+    } else if (type === 'credential') {
+      logs.push({
+        type: 'credential',
         timestamp: toISOString(payload.timestamp),
         details: payload
       });

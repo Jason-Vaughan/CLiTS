@@ -1,6 +1,6 @@
 {
   "name": "@puberty-labs/clits",
-  "version": "1.0.3",
+  "version": "1.0.4-beta.0",
   "description": "Chrome Log Inspector & Troubleshooting System (CLiTS) - A tool for extracting and sharing debugging data for AI and web projects.",
   "type": "module",
   "main": "dist/index.js",
