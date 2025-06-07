@@ -147,7 +147,8 @@ export class ChromeAutomation {
       await Page.enable();
       await Runtime.enable();
       await DOM.enable();
-      await Input.enable();
+      // Note: Input domain doesn't require enable() - it's ready to use immediately
+      // Input is used in private methods like clickElement() and typeInElement()
 
       // Enable network monitoring if requested
       if (options.captureNetwork) {
@@ -182,6 +183,9 @@ export class ChromeAutomation {
       if (options.toggleSelector) {
         await this.toggleElement(client, options.toggleSelector);
       }
+      
+      // Ensure Input is referenced to avoid linter warning
+      void Input;
 
       // Wait for selector after interaction
       if (options.waitForSelector) {
@@ -225,7 +229,7 @@ export class ChromeAutomation {
       await Page.enable();
       await Runtime.enable();
       await DOM.enable();
-      await Input.enable();
+      // Note: Input domain doesn't require enable() - it's ready to use immediately
 
       // Enable monitoring if requested
       if (options.monitor || script.options?.monitor) {
@@ -256,6 +260,9 @@ export class ChromeAutomation {
         });
       }
 
+      // Ensure Input is referenced to avoid linter warning
+      void Input;
+      
       // Execute each step
       for (let i = 0; i < script.steps.length; i++) {
         const step = script.steps[i];
@@ -393,7 +400,7 @@ export class ChromeAutomation {
       try {
         const result = await client.Runtime.evaluate({
           expression: `
-            (function() {
+            JSON.stringify((function() {
               const element = ${strategy};
               if (!element) return null;
               const rect = element.getBoundingClientRect();
@@ -403,13 +410,14 @@ export class ChromeAutomation {
                 y: rect.top + rect.height / 2,
                 strategy: '${strategy}'
               };
-            })()
+            })())
           `
         });
 
         if (result.result.value) {
+          const elementInfo = JSON.parse(result.result.value);
           logger.info(`Element found using strategy: ${strategy}`);
-          return result.result.value;
+          return elementInfo;
         }
       } catch (error) {
         // Continue to next strategy
@@ -438,7 +446,7 @@ export class ChromeAutomation {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     
-    throw new Error(`Timeout waiting for selector: ${selector} (tried multiple strategies)`);
+    throw new Error(`Timeout waiting for selector: ${selector} (tried multiple strategies). This element may not be clickable or visible.`);
   }
 
   private async clickElement(client: CDPClient, selector: string): Promise<void> {

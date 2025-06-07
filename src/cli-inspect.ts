@@ -135,232 +135,13 @@ async function waitForLoginOrTimeout(timeoutMs: number): Promise<void> {
   });
 }
 
-async function extractLinksFromPage(page: Page): Promise<Array<{ name: string; url: string }>> {
-  try {
-    const links = await page.evaluate(() => {
-      const linkElements = Array.from(document.querySelectorAll(`
-        a[href], 
-        button, 
-        input[type="button"], 
-        input[type="submit"], 
-        input[type="checkbox"],
-        input[type="radio"],
-        [role="button"], 
-        [role="switch"],
-        [role="checkbox"],
-        [onclick], 
-        [data-testid*="edit"], 
-        [data-testid*="delete"], 
-        [data-testid*="view"], 
-        [data-testid*="toggle"], 
-        [data-testid*="switch"], 
-        [data-testid*="btn"], 
-        [data-testid*="action"], 
-        [aria-label*="edit"], 
-        [aria-label*="delete"], 
-        [aria-label*="view"], 
-        [aria-label*="toggle"], 
-        [aria-label*="switch"], 
-        [class*="edit"], 
-        [class*="delete"], 
-        [class*="toggle"], 
-        [class*="switch"], 
-        [class*="btn"], 
-        [class*="button"], 
-        [class*="action"], 
-        .toggle, 
-        .switch, 
-        .btn, 
-        .button, 
-        .edit, 
-        .delete, 
-        .action,
-        .clickable,
-        [tabindex]:not([tabindex="-1"])
-      `.replace(/\s+/g, ' ').trim()));
-      return linkElements
-        .map(element => {
-          let href = '';
-          let text = element.textContent?.trim() || '';
-          
-          if (element.tagName.toLowerCase() === 'a') {
-            href = (element as HTMLAnchorElement).href;
-          } else if (element.hasAttribute('onclick')) {
-            // For buttons with onclick, we'll use a special marker
-            href = `javascript:${element.getAttribute('onclick')}`;
-            text = text || element.getAttribute('aria-label') || element.getAttribute('title') || 'Button';
-          } else {
-            // For other interactive elements, try to find nearby links or use data attributes
-            const nearbyLink = element.closest('a') || element.querySelector('a');
-            if (nearbyLink) {
-              href = (nearbyLink as HTMLAnchorElement).href;
-            } else {
-              // Use data attributes or create a selector-based identifier
-              const testId = element.getAttribute('data-testid');
-              const id = element.getAttribute('id');
-              const className = element.getAttribute('class');
-              
-                            if (testId) {
-                href = `[data-testid="${testId}"]`;
-              } else if (id) {
-                href = `#${id}`;
-              } else if (className) {
-                // Use the first meaningful class name
-                const classes = className.split(' ').filter(c => c.length > 2);
-                if (classes.length > 0) {
-                  href = `.${classes[0]}`;
-                } else {
-                  href = `selector:fallback`;
-                }
-              } else {
-                // Create a more specific selector using tag name and position
-                const tagName = element.tagName.toLowerCase();
-                const parent = element.parentElement;
-                if (parent) {
-                  const siblings = Array.from(parent.children).filter(el => el.tagName.toLowerCase() === tagName);
-                  const index = siblings.indexOf(element);
-                  href = `${tagName}:nth-of-type(${index + 1})`;
-                } else {
-                  href = tagName;
-                }
-              }
-            }
-            
-            // Better text extraction for different element types
-            if (!text) {
-              text = element.getAttribute('aria-label') || 
-                     element.getAttribute('title') || 
-                     element.getAttribute('data-testid') || 
-                     element.getAttribute('placeholder') ||
-                     element.getAttribute('value') ||
-                     element.getAttribute('alt') ||
-                     '';
-            }
-            
-            // Try to get context from parent elements to make descriptions more meaningful
-            if (!text || text.length < 3) {
-              // Look for nearby text content that might describe this element
-              let contextText = '';
-              
-              // Search through parent hierarchy for meaningful context
-              let currentElement = element.parentElement;
-              let depth = 0;
-              while (currentElement && depth < 5) {
-                // Look for headings, labels, or cards that might contain this element
-                const headings = currentElement.querySelectorAll('h1, h2, h3, h4, h5, h6');
-                const labels = currentElement.querySelectorAll('label, .label, [data-label]');
-                const titles = currentElement.querySelectorAll('[title], .title, .name');
-                
-                // Get text from these elements
-                for (const heading of headings) {
-                  const headingText = heading.textContent?.trim();
-                  if (headingText && headingText.length < 50) {
-                    contextText = headingText;
-                    break;
-                  }
-                }
-                
-                if (!contextText) {
-                  for (const label of labels) {
-                    const labelText = label.textContent?.trim();
-                    if (labelText && labelText.length < 50) {
-                      contextText = labelText;
-                      break;
-                    }
-                  }
-                }
-                
-                if (!contextText) {
-                  for (const title of titles) {
-                    const titleText = title.textContent?.trim();
-                    if (titleText && titleText.length < 50) {
-                      contextText = titleText;
-                      break;
-                    }
-                  }
-                }
-                
-                if (contextText) break;
-                currentElement = currentElement.parentElement;
-                depth++;
-              }
-              
-              // Look for specific patterns in class names that might be meaningful
-              const className = element.getAttribute('class') || '';
-              let actionType = '';
-              if (className.includes('edit')) {
-                actionType = 'Edit';
-              } else if (className.includes('delete')) {
-                actionType = 'Delete';
-              } else if (className.includes('toggle')) {
-                actionType = 'Toggle';
-              } else if (className.includes('switch')) {
-                actionType = 'Switch';
-              } else if (className.includes('add')) {
-                actionType = 'Add';
-              } else if (className.includes('refresh')) {
-                actionType = 'Refresh';
-              }
-              
-              // Combine context and action type
-              if (contextText && actionType) {
-                text = `${actionType} - ${contextText}`;
-              } else if (contextText) {
-                text = contextText;
-              } else if (actionType) {
-                text = `${actionType} Button`;
-              }
-            }
-            
-            // Add element type info to help identify what it is
-            const elementType = element.tagName.toLowerCase();
-            const elementRole = element.getAttribute('role');
-            const inputType = element.getAttribute('type');
-            
-            if (elementType === 'input') {
-              text = text || `${inputType || 'input'} field`;
-            } else if (elementType === 'button') {
-              text = text || 'Button';
-            } else if (elementRole) {
-              text = text || `${elementRole} element`;
-            } else {
-              text = text || `${elementType} element`;
-            }
-            
-            // Clean up the text - remove extra whitespace and limit length
-            text = text.replace(/\s+/g, ' ').trim();
-            if (text.length > 80) {
-              text = text.substring(0, 77) + '...';
-            }
-          }
-          
-          return { name: text, url: href };
-        })
-        .filter(link => {
-          // Filter out empty links, but keep our special selector and javascript links
-          return link.url && 
-                 link.name.length > 0 && 
-                 link.name.length < 100 && // Reasonable text length
-                 (link.url.startsWith('http') || 
-                  link.url.startsWith('javascript:') || 
-                  link.url.startsWith('selector:') ||
-                  link.url.startsWith('.') ||
-                  link.url.startsWith('#') ||
-                  link.url.startsWith('[') ||
-                  /^[a-z]+(:nth-of-type\(\d+\))?$/.test(link.url)); // tag selectors
-        })
-        .slice(0, 15); // Limit to 15 most relevant elements to prevent terminal freezing
-    });
-    return links;
-  } catch (error) {
-    console.error('Error extracting links:', error);
-    return [];
-  }
-}
 
-async function extractLinksFromCurrentChromePage(): Promise<Array<{ name: string; url: string }>> {
+
+
+
+async function buildElementHierarchy(): Promise<Array<{ name: string; url: string; level: number; parent?: string }>> {
   try {
-    // Connect directly to Chrome to get current page content
+    // Connect directly to Chrome to analyze DOM hierarchy
     const CDP = await import('chrome-remote-interface');
     const client = await CDP.default({ port: 9222 });
     
@@ -369,135 +150,395 @@ async function extractLinksFromCurrentChromePage(): Promise<Array<{ name: string
     await Runtime.enable();
     await DOM.enable();
     
-    // Execute the same link extraction logic directly in Chrome
+    // Execute hierarchy analysis in Chrome
     const result = await Runtime.evaluate({
       expression: `
         JSON.stringify((() => {
-          const linkElements = Array.from(document.querySelectorAll(\`
-            a[href], 
-            button, 
-            input[type="button"], 
-            input[type="submit"], 
-            input[type="checkbox"],
-            input[type="radio"],
-            [role="button"], 
-            [role="switch"],
-            [role="checkbox"],
-            [onclick], 
-            [data-testid*="edit"], 
-            [data-testid*="delete"], 
-            [data-testid*="view"], 
-            [data-testid*="toggle"], 
-            [data-testid*="switch"], 
-            [data-testid*="btn"], 
-            [data-testid*="action"], 
-            [aria-label*="edit"], 
-            [aria-label*="delete"], 
-            [aria-label*="view"], 
-            [aria-label*="toggle"], 
-            [aria-label*="switch"], 
-            [class*="edit"], 
-            [class*="delete"], 
-            [class*="toggle"], 
-            [class*="switch"], 
-            [class*="btn"], 
-            [class*="button"], 
-            [class*="action"], 
-            .toggle, 
-            .switch, 
-            .btn, 
-            .button, 
-            .edit, 
-            .delete, 
-            .action,
-            .clickable,
-            [tabindex]:not([tabindex="-1"])
-          \`.replace(/\\s+/g, ' ').trim()));
-          return linkElements
-            .map(element => {
-              let href = '';
-              let text = element.textContent?.trim() || '';
-              
-              if (element.tagName.toLowerCase() === 'a') {
-                href = element.href;
-              } else if (element.hasAttribute('onclick')) {
-                href = 'javascript:' + element.getAttribute('onclick');
-                text = text || element.getAttribute('aria-label') || element.getAttribute('title') || 'Button';
-              } else {
-                const nearbyLink = element.closest('a') || element.querySelector('a');
-                if (nearbyLink) {
-                  href = nearbyLink.href;
-                } else {
-                  const testId = element.getAttribute('data-testid');
-                  const id = element.getAttribute('id');
-                  const className = element.getAttribute('class');
-                  if (testId) {
-                    href = '[data-testid="' + testId + '"]';
-                  } else if (id) {
-                    href = '#' + id;
-                  } else if (className) {
-                    const classes = className.split(' ').filter(c => c.length > 2);
-                    if (classes.length > 0) {
-                      href = '.' + classes[0];
-                    } else {
-                      href = 'selector:fallback';
-                    }
-                  }
-                }
-                text = text || element.getAttribute('aria-label') || element.getAttribute('title') || element.getAttribute('data-testid') || 'Interactive Element';
-              }
-              
-              return { name: text, url: href };
-            })
-            .filter(link => {
-              return link.url && 
-                     link.name.length > 0 && 
-                     link.name.length < 100 &&
-                     (link.url.startsWith('http') || 
-                      link.url.startsWith('javascript:') || 
-                      link.url.startsWith('selector:') ||
-                      link.url.startsWith('.') ||
-                      link.url.startsWith('#') ||
-                      link.url.startsWith('[') ||
-                      /^[a-z]+(:nth-of-type\\(\\d+\\))?$/.test(link.url));
-            })
-            .slice(0, 15);
+          const hierarchy = [];
+          
+          // Find all interactive elements and their hierarchy levels
+          const interactiveSelectors = [
+            'a[href]', 'button', 'input[type="button"]', 'input[type="submit"]',
+            'input[type="checkbox"]', 'input[type="radio"]', '[role="button"]',
+            '[role="switch"]', '[role="checkbox"]', '[onclick]', '[data-testid*="edit"]',
+            '[data-testid*="delete"]', '[data-testid*="view"]', '[data-testid*="toggle"]',
+            '[data-testid*="switch"]', '[data-testid*="btn"]', '[data-testid*="action"]',
+            '[aria-label*="edit"]', '[aria-label*="delete"]', '[aria-label*="view"]',
+            '[aria-label*="toggle"]', '[aria-label*="switch"]', '[class*="edit"]',
+            '[class*="delete"]', '[class*="toggle"]', '[class*="switch"]',
+            '[class*="btn"]', '[class*="button"]', '[class*="action"]',
+            '.toggle', '.switch', '.btn', '.button', '.edit', '.delete', '.action',
+            '.clickable', '[tabindex]:not([tabindex="-1"])'
+          ];
+          
+          const allElements = document.querySelectorAll(interactiveSelectors.join(', '));
+          
+                     Array.from(allElements).forEach(element => {
+             // Calculate hierarchy level based on DOM depth from body
+             let level = 0;
+             let parent = element.parentElement;
+             while (parent && parent !== document.body) {
+               level++;
+               parent = parent.parentElement;
+             }
+             
+             // Normalize levels - make top-level interactive elements level 0
+             // Subtract a base level to bring common elements closer to 0
+             level = Math.max(0, level - 5); // More aggressive normalization
+            
+            // Get element info
+            let href = '';
+            let text = element.textContent?.trim() || '';
+            
+            if (element.tagName.toLowerCase() === 'a') {
+              href = element.href;
+            } else if (element.hasAttribute('onclick')) {
+              href = 'javascript:' + element.getAttribute('onclick');
+              text = text || element.getAttribute('aria-label') || element.getAttribute('title') || 'Button';
+                         } else {
+               const testId = element.getAttribute('data-testid');
+               const id = element.getAttribute('id');
+               const className = element.getAttribute('class');
+               
+               // Only skip elements that are clearly non-interactive layout containers
+               // Be much more conservative - only skip if it's clearly a layout element
+               const isDefinitelyLayoutOnly = className && 
+                 (className.includes('MuiBox-root') || 
+                  className.includes('MuiGrid-root') || 
+                  className.includes('MuiContainer-root') ||
+                  className.includes('MuiStack-root') ||
+                  className.includes('MuiPaper-root') ||
+                  className.includes('MuiTypography-root')) &&
+                 !element.hasAttribute('onclick') &&
+                 !element.hasAttribute('role') &&
+                 !testId &&
+                 !element.getAttribute('aria-label') &&
+                 !element.getAttribute('title') &&
+                 element.tagName.toLowerCase() !== 'button' &&
+                 element.tagName.toLowerCase() !== 'input' &&
+                 element.tagName.toLowerCase() !== 'a' &&
+                 (!element.textContent || element.textContent.trim().length === 0);
+               
+               if (isDefinitelyLayoutOnly) {
+                 return; // Skip this element entirely
+               }
+               
+               if (testId) {
+                 href = '[data-testid="' + testId + '"]';
+               } else if (id) {
+                 href = '#' + id;
+               } else if (className) {
+                 // For buttons, use a simple approach that works with our existing fallback system
+                 if (element.tagName.toLowerCase() === 'button') {
+                   const buttonText = element.textContent?.trim();
+                   const ariaLabel = element.getAttribute('aria-label');
+                   
+                   if (ariaLabel) {
+                     href = \`button[aria-label="\${ariaLabel}"]\`;
+                   } else if (buttonText && buttonText.length > 0 && buttonText.length < 50) {
+                     // Use the button text directly - our findElementWithFallback will handle the search
+                     href = buttonText;
+                   } else {
+                     href = 'button'; // Generic button selector as last resort
+                   }
+                 } else {
+                   // For non-buttons, try to find meaningful classes
+                   const classes = className.split(' ').filter(c => 
+                     c.length > 2 && 
+                     !c.startsWith('Mui') && // Block Material-UI classes for non-buttons
+                     !c.includes('css-') &&
+                     !c.startsWith('r') &&
+                     !c.startsWith('e') && // Often auto-generated classes
+                     !c.match(/^[a-z]{1,3}[0-9]+$/) // Short auto-generated classes like 'r1', 'e2a'
+                   );
+                   
+                   if (classes.length > 0) {
+                     // Prefer more specific classes
+                     const specificClass = classes.find(c => 
+                       c.includes('button') || 
+                       c.includes('Button') || 
+                       c.includes('switch') || 
+                       c.includes('Switch') ||
+                       c.includes('toggle') ||
+                       c.includes('Toggle') ||
+                       c.includes('clickable')
+                     ) || classes[0];
+                     
+                     href = '.' + specificClass;
+                   } else {
+                   // Generate a more specific selector using tag + attributes
+                   const tag = element.tagName.toLowerCase();
+                   const role = element.getAttribute('role');
+                   const type = element.getAttribute('type');
+                   const ariaLabel = element.getAttribute('aria-label');
+                   const dataTestId = element.getAttribute('data-testid');
+                   
+                   // Prioritize more specific attributes
+                   if (dataTestId) {
+                     href = '[data-testid="' + dataTestId + '"]';
+                   } else if (ariaLabel) {
+                     href = '[aria-label="' + ariaLabel + '"]';
+                   } else if (role) {
+                     href = tag + '[role="' + role + '"]';
+                   } else if (type) {
+                     href = tag + '[type="' + type + '"]';
+                   } else {
+                     // Last resort: use tag with text content if it's short and specific
+                     const textContent = element.textContent?.trim();
+                     if (textContent && textContent.length > 2 && textContent.length < 30) {
+                       href = tag + ':contains("' + textContent.replace(/"/g, '\\"') + '")';
+                     } else {
+                       href = tag;
+                     }
+                   }
+                 }
+               }
+               // Build comprehensive element description
+               let description = '';
+               
+               // 1. Try multiple sources for meaningful text
+               const ariaLabel = element.getAttribute('aria-label');
+               const title = element.getAttribute('title');
+               const placeholder = element.getAttribute('placeholder');
+               const alt = element.getAttribute('alt');
+               const dataTestId = element.getAttribute('data-testid');
+               const role = element.getAttribute('role');
+               const tagName = element.tagName.toLowerCase();
+               const inputType = element.getAttribute('type');
+               
+               // 2. Get clean text content (avoid generic container text)
+               let elementText = text || element.textContent?.trim() || '';
+               if (elementText.length > 100) {
+                 // If text is too long, it's probably container text, try to find specific button/link text
+                 const specificElements = element.querySelectorAll('button, a, input, [role="button"]');
+                 if (specificElements.length === 1) {
+                   elementText = specificElements[0].textContent?.trim() || '';
+                 } else {
+                   elementText = elementText.substring(0, 50) + '...';
+                 }
+               }
+               
+               // 3. Build description based on available information
+               if (ariaLabel && ariaLabel.length > 2) {
+                 description = ariaLabel;
+               } else if (title && title.length > 2) {
+                 description = title;
+               } else if (placeholder) {
+                 description = \`Input: \${placeholder}\`;
+               } else if (alt) {
+                 description = \`Image: \${alt}\`;
+               } else if (dataTestId) {
+                 description = dataTestId.replace(/-/g, ' ').replace(/_/g, ' ');
+               } else if (elementText && elementText.length > 2) {
+                 description = elementText;
+               } else {
+                 // Fallback to tag name with type
+                 description = inputType ? \`\${tagName} (\${inputType})\` : tagName;
+               }
+               
+               // 4. Add context from parent elements
+               let parentContext = '';
+               const contextElement = element.closest('[data-testid], [aria-label], [title], .MuiCard-root, .MuiDialog-root, .MuiPaper-root');
+               if (contextElement && contextElement !== element) {
+                 const contextText = contextElement.getAttribute('data-testid') || 
+                                   contextElement.getAttribute('aria-label') || 
+                                   contextElement.getAttribute('title') || '';
+                 if (contextText && contextText.length > 2 && contextText.length < 30 && !description.includes(contextText)) {
+                   parentContext = contextText.replace(/-/g, ' ').replace(/_/g, ' ');
+                 }
+               }
+               
+               // 5. Combine description and context
+               let finalName = description;
+               if (parentContext) {
+                 finalName = \`\${parentContext} → \${description}\`;
+               }
+               
+               // 6. Add element type emoji for clarity
+               if (tagName === 'button' || role === 'button' || element.onclick) {
+                 finalName = \`🔘 \${finalName}\`;
+               } else if (tagName === 'input') {
+                 finalName = \`📝 \${finalName}\`;
+               } else if (tagName === 'a') {
+                 finalName = \`🔗 \${finalName}\`;
+               } else if (role === 'tab') {
+                 finalName = \`📑 \${finalName}\`;
+               } else if (role === 'menuitem') {
+                 finalName = \`📋 \${finalName}\`;
+               }
+               
+               text = finalName;
+             }
+            
+                         // Skip elements that are clearly non-interactive layout containers or too generic
+             const isGenericMuiClass = href && (
+               href === '.MuiBox-root' || 
+               href === '.MuiGrid-root' || 
+               href === '.MuiContainer-root' ||
+               href === '.MuiStack-root' ||
+               href === '.MuiPaper-root' ||
+               href === '.MuiTypography-root'
+               // Note: We no longer block ALL Material-UI classes, only specific layout ones
+             );
+             
+             if (href && text.length > 0 && text.length < 150 && !isGenericMuiClass) {
+               hierarchy.push({
+                 name: text,
+                 url: href,
+                 level: Math.min(level, 5), // Cap at 5 levels for usability
+                 parent: undefined
+               });
+             }
+          });
+          
+          return hierarchy;
         })())
       `
     });
     
     await client.close();
-    return JSON.parse(result.result.value || '[]');
+    
+    if (result.result.value) {
+      return JSON.parse(result.result.value);
+    }
+    
+    return [];
   } catch (error) {
-    console.error('Error extracting links from Chrome:', error);
+    console.warn('Failed to build element hierarchy:', error);
     return [];
   }
 }
 
+async function getCurrentPageName(): Promise<string> {
+  try {
+    const CDP = await import('chrome-remote-interface');
+    const client = await CDP.default({ port: 9222 });
+    
+    const { Page, Runtime } = client;
+    await Page.enable();
+    await Runtime.enable();
+    
+    // Get page title and URL to determine page name
+    const result = await Runtime.evaluate({
+      expression: `
+        JSON.stringify({
+          title: document.title,
+          url: window.location.href,
+          pathname: window.location.pathname
+        })
+      `
+    });
+    
+    await client.close();
+    
+    if (result.result.value) {
+      const pageInfo = JSON.parse(result.result.value);
+      
+      // Try to extract meaningful page name from title or URL
+      if (pageInfo.title && pageInfo.title !== 'React App') {
+        return pageInfo.title;
+      }
+      
+      // Extract from pathname
+      const pathParts = pageInfo.pathname.split('/').filter((part: string) => part.length > 0);
+      if (pathParts.length > 0) {
+        return pathParts[pathParts.length - 1].replace(/-/g, ' ').replace(/_/g, ' ');
+      }
+      
+      return 'Current Page';
+    }
+    
+    return 'Unknown Page';
+  } catch (error) {
+    console.warn('Failed to get page name:', error);
+    return 'Current Page';
+  }
+}
+
 async function chromeRemoteControl(automation: ChromeAutomation, page: Page): Promise<void> {
-  const spinner = ora('Extracting links from current page...').start();
+  const spinner = ora('Analyzing page hierarchy...').start();
   
   try {
-    let links = await extractLinksFromPage(page);
+    let currentPageName = 'Dashboard'; // Track current page name
+    let currentLevel = 0; // Current hierarchy level
+    let allElements: Array<{ name: string; url: string; level: number; parent?: string }> = [];
     
-    if (links.length === 0) {
-      spinner.fail('No navigable links found on this page');
+    // Get initial page name
+    try {
+      currentPageName = await getCurrentPageName();
+    } catch (error) {
+      console.warn('Could not get initial page name, using Dashboard');
+    }
+    
+    // Build element hierarchy
+    allElements = await buildElementHierarchy();
+    
+    if (allElements.length === 0) {
+      spinner.fail('No navigable elements found on this page');
       return;
     }
     
-    spinner.succeed(`Found ${links.length} links`);
+    // Analyze level distribution and find the most populated level
+    const levelCounts = new Map<number, number>();
+    allElements.forEach(el => {
+      levelCounts.set(el.level, (levelCounts.get(el.level) || 0) + 1);
+    });
+    
+    // Find the level with the most elements (likely the main content level)
+    let bestLevel = 0;
+    let maxCount = 0;
+    for (const [level, count] of levelCounts.entries()) {
+      if (count > maxCount) {
+        maxCount = count;
+        bestLevel = level;
+      }
+    }
+    
+    // Shift levels so the most populated level becomes level 0
+    const levelShift = bestLevel;
+    allElements.forEach(el => {
+      el.level = Math.max(0, el.level - levelShift);
+    });
+    
+    // Recalculate level distribution after shifting
+    levelCounts.clear();
+    allElements.forEach(el => {
+      levelCounts.set(el.level, (levelCounts.get(el.level) || 0) + 1);
+    });
+    
+    const maxLevel = Math.max(...Array.from(levelCounts.keys()));
+    currentLevel = 0; // Start at the main content level
+    
+    spinner.succeed(`Found ${allElements.length} elements across ${maxLevel + 1} hierarchy levels on ${currentPageName}`);
+    
+    // Debug: Show level distribution
+    console.log(chalk.gray('Level distribution:'));
+    for (let i = 0; i <= maxLevel; i++) {
+      const count = levelCounts.get(i) || 0;
+      console.log(chalk.gray(`  Level ${i}: ${count} elements`));
+    }
     
     let controlRunning = true;
     while (controlRunning) {
-      console.log(chalk.blue('\n🎮 Chrome Remote Control'));
-      console.log(chalk.gray('Use arrow keys to navigate, Enter to select\n'));
+      console.log(chalk.blue('\n🎮 Chrome Remote Control - Hierarchical Navigation'));
+      console.log(chalk.gray('Use ↑↓ to navigate, ←→ for hierarchy levels, Enter to select\n'));
+      console.log(chalk.cyan(`Current Page: ${currentPageName}`));
+      console.log(chalk.magenta(`Current Level: ${currentLevel} (${levelCounts.get(currentLevel) || 0} elements)`));
       
+      // Filter elements by current level
+      const currentLevelElements = allElements.filter(el => el.level === currentLevel);
+      
+      // Build choices for current level
       const choices = [
-        ...links.map(link => ({
-          name: `${link.name.slice(0, 60)}${link.name.length > 60 ? '...' : ''} ${chalk.gray(`(${link.url.slice(0, 50)}${link.url.length > 50 ? '...' : ''})`)}`,
-          value: link.url
+        ...currentLevelElements.map(element => ({
+          name: `${element.name.slice(0, 80)}${element.name.length > 80 ? '...' : ''} ${chalk.gray(`(L${element.level}) ${element.url.slice(0, 30)}${element.url.length > 30 ? '...' : ''}`)}`,
+          value: element.url
         })),
-        { name: chalk.yellow('🔄 Refresh links from current page'), value: 'refresh' },
+        new inquirer.Separator(),
+        // Navigation options
+        ...(currentLevel > 0 ? [{ name: chalk.blue('⬅️  Level Up (less specific elements)'), value: 'level_up' }] : []),
+        ...(currentLevel < maxLevel ? [{ name: chalk.blue('➡️  Level Down (more specific elements)'), value: 'level_down' }] : []),
+        { name: chalk.yellow('🔄 Refresh elements from current page'), value: 'refresh' },
         { name: chalk.red('❌ Exit Chrome Remote Control'), value: 'exit' }
       ];
       
@@ -505,9 +546,9 @@ async function chromeRemoteControl(automation: ChromeAutomation, page: Page): Pr
         {
           type: 'list',
           name: 'selectedUrl',
-          message: 'Select an option:',
+          message: `Select an option (Level ${currentLevel}/${maxLevel}):`,
           choices,
-          pageSize: 10
+          pageSize: 15
         }
       ]);
       
@@ -516,19 +557,39 @@ async function chromeRemoteControl(automation: ChromeAutomation, page: Page): Pr
         return;
       }
       
+      if (selectedUrl === 'level_up') {
+        currentLevel = Math.max(0, currentLevel - 1);
+        console.log(chalk.blue(`Moved to Level ${currentLevel} (${levelCounts.get(currentLevel) || 0} elements)`));
+        continue;
+      }
+      
+      if (selectedUrl === 'level_down') {
+        currentLevel = Math.min(maxLevel, currentLevel + 1);
+        console.log(chalk.blue(`Moved to Level ${currentLevel} (${levelCounts.get(currentLevel) || 0} elements)`));
+        continue;
+      }
+      
       if (selectedUrl === 'refresh') {
-        const refreshSpinner = ora('Refreshing links from current page...').start();
+        const refreshSpinner = ora('Refreshing page hierarchy...').start();
         try {
-          // Get fresh page content from Chrome directly
-          const newLinks = await extractLinksFromCurrentChromePage();
-          if (newLinks.length > 0) {
-            links = newLinks; // Replace all links
-            refreshSpinner.succeed(`Found ${newLinks.length} links on current page`);
+          // Rebuild element hierarchy
+          allElements = await buildElementHierarchy();
+          
+          if (allElements.length > 0) {
+            // Recalculate level distribution
+            levelCounts.clear();
+            allElements.forEach(el => {
+              levelCounts.set(el.level, (levelCounts.get(el.level) || 0) + 1);
+            });
+            
+            // Reset to level 0 after refresh
+            currentLevel = 0;
+            refreshSpinner.succeed(`Found ${allElements.length} elements on ${currentPageName}`);
           } else {
-            refreshSpinner.warn('No links found on current page');
+            refreshSpinner.warn('No elements found on current page');
           }
         } catch (error) {
-          refreshSpinner.fail(`Failed to refresh links: ${error instanceof Error ? error.message : String(error)}`);
+          refreshSpinner.fail(`Failed to refresh elements: ${error instanceof Error ? error.message : String(error)}`);
         }
         continue;
       }
@@ -560,31 +621,44 @@ async function chromeRemoteControl(automation: ChromeAutomation, page: Page): Pr
           try {
             await automation.interact({
               clickSelector: selector,
-              timeout: 10000
+              timeout: 5000  // Reduced timeout for faster feedback on non-clickable elements
             });
             navSpinner.succeed(`✅ Successfully clicked element: ${selector}`);
           } catch (error) {
             navSpinner.fail(`❌ Failed to click element: ${selector}`);
             console.log(chalk.yellow(`Error details: ${error instanceof Error ? error.message : String(error)}`));
-            console.log(chalk.gray('This helps us debug the automation system!'));
+            console.log(chalk.gray('This element may be a layout container rather than an interactive element.'));
+            console.log(chalk.gray('Try selecting a different element or use the refresh option to get updated elements.'));
           }
         }
         
-        // Wait a moment for page to load, then auto-refresh links
+        // Wait a moment for page to load, then auto-refresh hierarchy
         await new Promise(resolve => setTimeout(resolve, 2000));
         
-        const refreshSpinner = ora('Auto-refreshing links from new page...').start();
+        const refreshSpinner = ora('Auto-refreshing elements from new page...').start();
         try {
-          // Get fresh links from current Chrome page
-          const newLinks = await extractLinksFromCurrentChromePage();
-          if (newLinks.length > 0) {
-            links = newLinks; // Replace all links
-            refreshSpinner.succeed(`Found ${newLinks.length} new links`);
+          // Rebuild element hierarchy for new page
+          allElements = await buildElementHierarchy();
+          
+          // Try to determine the new page name from the URL or page title
+          const newPageName = await getCurrentPageName();
+          currentPageName = newPageName;
+          
+          if (allElements.length > 0) {
+            // Recalculate level distribution
+            levelCounts.clear();
+            allElements.forEach(el => {
+              levelCounts.set(el.level, (levelCounts.get(el.level) || 0) + 1);
+            });
+            
+            // Reset to level 0 after navigation
+            currentLevel = 0;
+            refreshSpinner.succeed(`Found ${allElements.length} elements on ${currentPageName}`);
           } else {
-            refreshSpinner.warn('No new links found, keeping previous links');
+            refreshSpinner.warn('No new elements found, keeping previous elements');
           }
         } catch (error) {
-          refreshSpinner.fail('Failed to refresh links, keeping previous ones');
+          refreshSpinner.fail('Failed to refresh elements, keeping previous ones');
         }
         
       } catch (error) {
