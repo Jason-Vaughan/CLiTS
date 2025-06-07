@@ -6,8 +6,9 @@ import { Command } from 'commander';
 import { readFileSync } from 'fs';
 import { PathResolver } from './utils/path-resolver.js';
 import { ChromeExtractor } from './chrome-extractor.js';
+import { ChromeAutomation } from './chrome-automation.js';
 import inquirer from 'inquirer';
-import tabtab from 'tabtab';
+// import tabtab from 'tabtab'; // Disabled to prevent automatic shell completion prompts
 
 const pathResolver = PathResolver.getInstance();
 const packageJson = JSON.parse(readFileSync(pathResolver.resolvePath('package.json'), 'utf8'));
@@ -23,6 +24,9 @@ async function main(): Promise<void> {
 Examples:
   $ clits extract --chrome --interactive
   $ clits extract --source ./logs --patterns "*.log" --output-file ./output.json
+  $ clits navigate --url "http://localhost:5173/displays" --wait-for ".displays-manager"
+  $ clits interact --click "[data-testid='edit-btn']" --wait-for ".edit-dialog" --capture-network
+  $ clits automate --script automation.json --monitor --save-results results.json
     `);
 
   program
@@ -188,25 +192,152 @@ Examples:
       }
     });
 
-  // Add command completion
-  program.command('completion', 'Generate completion script for your shell.')
-    .action(async () => {
-        await tabtab.install({
-            name: 'clits',
-            completer: 'clits'
+  // Navigate command
+  program
+    .command('navigate')
+    .description('Navigate to URLs and wait for elements')
+    .requiredOption('--url <url>', 'Navigate to specific URL')
+    .option('--wait-for <selector>', 'Wait for CSS selector to appear')
+    .option('--timeout <ms>', 'Timeout in milliseconds', '30000')
+    .option('--screenshot <path>', 'Take screenshot after navigation')
+    .option('--chrome-host <host>', 'Specify the host for the Chrome DevTools protocol', 'localhost')
+    .option('--chrome-port <port>', 'Specify the port for the Chrome DevTools protocol', '9222')
+    .action(async (options) => {
+      try {
+        const automation = new ChromeAutomation(
+          parseInt(options.chromePort),
+          options.chromeHost
+        );
+
+        await automation.navigate({
+          url: options.url,
+          waitForSelector: options.waitFor,
+          timeout: parseInt(options.timeout),
+          screenshotPath: options.screenshot,
+          chromePort: parseInt(options.chromePort),
+          chromeHost: options.chromeHost
         });
+
+        console.log(`[CLiTS-NAVIGATOR] Successfully navigated to: ${options.url}`);
+      } catch (error) {
+        console.error(`[CLiTS-NAVIGATOR] Navigation failed: ${error instanceof Error ? error.message : String(error)}`);
+        process.exit(1);
+      }
     });
 
-  // Handle completion requests
-  if (process.argv.slice(2)[0] === 'completion') {
-    const env = tabtab.parseEnv(process.env);
-    if (env.complete) {
-      const commands = program.commands.map(cmd => cmd.name());
-      const options = program.options.map(opt => opt.long).filter(Boolean) as string[];
-      const allCompletions = [...commands, ...options];
-      return tabtab.log(allCompletions);
-    }
-  }
+  // Interact command
+  program
+    .command('interact')
+    .description('Interact with page elements')
+    .option('--click <selector>', 'Click on element matching CSS selector')
+    .option('--type <selector> <text>', 'Type text into input field')
+    .option('--toggle <selector>', 'Toggle switch/checkbox elements')
+    .option('--wait-for <selector>', 'Wait for element after interaction')
+    .option('--timeout <ms>', 'Timeout in milliseconds', '10000')
+    .option('--capture-network', 'Capture network requests during interaction')
+    .option('--screenshot <path>', 'Take screenshot after interaction')
+    .option('--chrome-host <host>', 'Specify the host for the Chrome DevTools protocol', 'localhost')
+    .option('--chrome-port <port>', 'Specify the port for the Chrome DevTools protocol', '9222')
+    .action(async (options) => {
+      try {
+        const automation = new ChromeAutomation(
+          parseInt(options.chromePort),
+          options.chromeHost
+        );
+
+        // Parse type command if provided
+        let typeSelector: string | undefined;
+        let typeText: string | undefined;
+        if (options.type) {
+          const typeArgs = options.type.split(' ');
+          if (typeArgs.length >= 2) {
+            typeSelector = typeArgs[0];
+            typeText = typeArgs.slice(1).join(' ');
+          }
+        }
+
+        await automation.interact({
+          clickSelector: options.click,
+          typeSelector,
+          typeText,
+          toggleSelector: options.toggle,
+          waitForSelector: options.waitFor,
+          timeout: parseInt(options.timeout),
+          captureNetwork: options.captureNetwork,
+          screenshotPath: options.screenshot,
+          chromePort: parseInt(options.chromePort),
+          chromeHost: options.chromeHost
+        });
+
+        console.log('[CLiTS-INTERACTOR] Interaction completed successfully');
+      } catch (error) {
+        console.error(`[CLiTS-INTERACTOR] Interaction failed: ${error instanceof Error ? error.message : String(error)}`);
+        process.exit(1);
+      }
+    });
+
+  // Automate command
+  program
+    .command('automate')
+    .description('Run automation scripts')
+    .requiredOption('--script <path>', 'JSON file with automation steps')
+    .option('--monitor', 'Enable monitoring during automation')
+    .option('--save-results <path>', 'Save results to file')
+    .option('--chrome-host <host>', 'Specify the host for the Chrome DevTools protocol', 'localhost')
+    .option('--chrome-port <port>', 'Specify the port for the Chrome DevTools protocol', '9222')
+    .action(async (options) => {
+      try {
+        const automation = new ChromeAutomation(
+          parseInt(options.chromePort),
+          options.chromeHost
+        );
+
+        const result = await automation.runAutomation({
+          scriptPath: options.script,
+          monitor: options.monitor,
+          saveResultsPath: options.saveResults,
+          chromePort: parseInt(options.chromePort),
+          chromeHost: options.chromeHost
+        });
+
+        if (result.success) {
+          console.log(`[CLiTS-AUTOMATOR] Automation completed successfully: ${result.completedSteps}/${result.totalSteps} steps`);
+        } else {
+          console.error(`[CLiTS-AUTOMATOR] Automation failed: ${result.error}`);
+          console.error(`[CLiTS-AUTOMATOR] Completed ${result.completedSteps}/${result.totalSteps} steps`);
+          process.exit(1);
+        }
+      } catch (error) {
+        console.error(`[CLiTS-AUTOMATOR] Automation failed: ${error instanceof Error ? error.message : String(error)}`);
+        process.exit(1);
+      }
+    });
+
+  // Inspect command - Interactive website inspector with Chrome Remote Control
+  program
+    .command('inspect')
+    .description('Interactive website inspector with Chrome Remote Control')
+    .action(async () => {
+      try {
+        // Import and run the inspect tool
+        const { main: runInspect } = await import('./cli-inspect.js');
+        await runInspect();
+      } catch (error) {
+        console.error(`[CLiTS-INSPECTOR] Inspect failed: ${error instanceof Error ? error.message : String(error)}`);
+        process.exit(1);
+      }
+    });
+
+  // Add command completion (optional - only if explicitly requested)
+  program.command('completion', 'Generate completion script for your shell.')
+    .action(async () => {
+        console.log('Shell completion is currently disabled to prevent automatic prompts.');
+        console.log('To enable completion, uncomment the tabtab code in src/cli.ts');
+        // await tabtab.install({
+        //     name: 'clits',
+        //     completer: 'clits'
+        // });
+    });
 
   await program.parseAsync();
 }

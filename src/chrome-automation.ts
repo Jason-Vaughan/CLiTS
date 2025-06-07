@@ -1,0 +1,521 @@
+// BSD: Chrome DevTools Protocol automation for navigation, interaction, and scripted automation tasks.
+// Provides browser automation capabilities including navigation, element interaction, and screenshot capture.
+
+import CDP from 'chrome-remote-interface';
+import { writeFileSync, readFileSync } from 'fs';
+import { ChromeExtractor } from './chrome-extractor.js';
+import { createLogger, format, transports } from 'winston';
+import { EventEmitter } from 'events';
+import fetch from 'node-fetch';
+
+const logger = createLogger({
+  level: 'info',
+  format: format.combine(
+    format.timestamp(),
+    format.json()
+  ),
+  transports: [
+    new transports.Console({
+      format: format.combine(
+        format.colorize(),
+        format.simple()
+      )
+    })
+  ]
+});
+
+export interface NavigationOptions {
+  url: string;
+  waitForSelector?: string;
+  timeout?: number;
+  screenshotPath?: string;
+  chromePort?: number;
+  chromeHost?: string;
+}
+
+export interface InteractionOptions {
+  clickSelector?: string;
+  typeSelector?: string;
+  typeText?: string;
+  toggleSelector?: string;
+  waitForSelector?: string;
+  timeout?: number;
+  captureNetwork?: boolean;
+  screenshotPath?: string;
+  chromePort?: number;
+  chromeHost?: string;
+}
+
+export interface AutomationStep {
+  action: 'navigate' | 'wait' | 'click' | 'type' | 'toggle' | 'screenshot';
+  url?: string;
+  selector?: string;
+  text?: string;
+  path?: string;
+  timeout?: number;
+}
+
+export interface AutomationScript {
+  steps: AutomationStep[];
+  options?: {
+    timeout?: number;
+    captureNetwork?: boolean;
+    monitor?: boolean;
+  };
+}
+
+export interface AutomationOptions {
+  scriptPath: string;
+  monitor?: boolean;
+  saveResultsPath?: string;
+  chromePort?: number;
+  chromeHost?: string;
+}
+
+export interface AutomationResult {
+  success: boolean;
+  completedSteps: number;
+  totalSteps: number;
+  error?: string;
+  screenshots?: string[];
+  networkLogs?: any[];
+  monitoringData?: any[];
+  timestamp: string;
+}
+
+interface CDPClient extends EventEmitter {
+  Page: any;
+  Runtime: any;
+  Network: any;
+  DOM: any;
+  Input: any;
+  close: () => Promise<void>;
+}
+
+export class ChromeAutomation {
+  private static readonly DEFAULT_PORT = 9222;
+  private static readonly DEFAULT_HOST = 'localhost';
+  private static readonly DEFAULT_TIMEOUT = 30000;
+
+  private port: number;
+  private host: string;
+  private chromeExtractor?: ChromeExtractor;
+
+  constructor(port: number = ChromeAutomation.DEFAULT_PORT, host: string = ChromeAutomation.DEFAULT_HOST) {
+    this.port = port;
+    this.host = host;
+  }
+
+  async navigate(options: NavigationOptions): Promise<void> {
+    const client = await this.connectToChrome();
+    
+    try {
+      const { Page, Runtime } = client;
+      
+      await Page.enable();
+      await Runtime.enable();
+
+      logger.info(`Navigating to: ${options.url}`);
+      await Page.navigate({ url: options.url });
+      
+      // Wait for page load
+      await Page.loadEventFired();
+      
+      // Wait for specific selector if provided
+      if (options.waitForSelector) {
+        await this.waitForSelector(client, options.waitForSelector, options.timeout);
+      }
+
+      // Take screenshot if requested
+      if (options.screenshotPath) {
+        await this.takeScreenshot(client, options.screenshotPath);
+      }
+
+      logger.info('Navigation completed successfully');
+    } finally {
+      await client.close();
+    }
+  }
+
+  async interact(options: InteractionOptions): Promise<void> {
+    const client = await this.connectToChrome();
+    const networkLogs: any[] = [];
+
+    try {
+      const { Page, Runtime, Network, DOM, Input } = client;
+      
+      await Page.enable();
+      await Runtime.enable();
+      await DOM.enable();
+      await Input.enable();
+
+      // Enable network monitoring if requested
+      if (options.captureNetwork) {
+        await Network.enable();
+        Network.requestWillBeSent((params: any) => {
+          networkLogs.push({
+            type: 'request',
+            timestamp: Date.now(),
+            ...params
+          });
+        });
+        Network.responseReceived((params: any) => {
+          networkLogs.push({
+            type: 'response',
+            timestamp: Date.now(),
+            ...params
+          });
+        });
+      }
+
+      // Perform click interaction
+      if (options.clickSelector) {
+        await this.clickElement(client, options.clickSelector);
+      }
+
+      // Perform type interaction
+      if (options.typeSelector && options.typeText) {
+        await this.typeInElement(client, options.typeSelector, options.typeText);
+      }
+
+      // Perform toggle interaction
+      if (options.toggleSelector) {
+        await this.toggleElement(client, options.toggleSelector);
+      }
+
+      // Wait for selector after interaction
+      if (options.waitForSelector) {
+        await this.waitForSelector(client, options.waitForSelector, options.timeout);
+      }
+
+      // Take screenshot if requested
+      if (options.screenshotPath) {
+        await this.takeScreenshot(client, options.screenshotPath);
+      }
+
+      // Log network activity if captured
+      if (options.captureNetwork && networkLogs.length > 0) {
+        logger.info(`Captured ${networkLogs.length} network events during interaction`);
+        console.log(JSON.stringify(networkLogs, null, 2));
+      }
+
+      logger.info('Interaction completed successfully');
+    } finally {
+      await client.close();
+    }
+  }
+
+  async runAutomation(options: AutomationOptions): Promise<AutomationResult> {
+    const script: AutomationScript = JSON.parse(readFileSync(options.scriptPath, 'utf8'));
+    const result: AutomationResult = {
+      success: false,
+      completedSteps: 0,
+      totalSteps: script.steps.length,
+      screenshots: [],
+      networkLogs: [],
+      monitoringData: [],
+      timestamp: new Date().toISOString()
+    };
+
+    const client = await this.connectToChrome();
+    
+    try {
+      const { Page, Runtime, Network, DOM, Input } = client;
+      
+      await Page.enable();
+      await Runtime.enable();
+      await DOM.enable();
+      await Input.enable();
+
+      // Enable monitoring if requested
+      if (options.monitor || script.options?.monitor) {
+        this.chromeExtractor = new ChromeExtractor({
+          port: options.chromePort || this.port,
+          host: options.chromeHost || this.host,
+          includeNetwork: script.options?.captureNetwork !== false,
+          includeConsole: true
+        });
+      }
+
+      // Enable network monitoring if needed
+      if (script.options?.captureNetwork !== false) {
+        await Network.enable();
+        Network.requestWillBeSent((params: any) => {
+          result.networkLogs!.push({
+            type: 'request',
+            timestamp: Date.now(),
+            ...params
+          });
+        });
+        Network.responseReceived((params: any) => {
+          result.networkLogs!.push({
+            type: 'response',
+            timestamp: Date.now(),
+            ...params
+          });
+        });
+      }
+
+      // Execute each step
+      for (let i = 0; i < script.steps.length; i++) {
+        const step = script.steps[i];
+        logger.info(`Executing step ${i + 1}/${script.steps.length}: ${step.action}`);
+
+        try {
+          await this.executeStep(client, step, result);
+          result.completedSteps++;
+        } catch (error) {
+          result.error = `Failed at step ${i + 1}: ${error instanceof Error ? error.message : String(error)}`;
+          logger.error(result.error);
+          break;
+        }
+      }
+
+      result.success = result.completedSteps === result.totalSteps;
+
+      // Save results if requested
+      if (options.saveResultsPath) {
+        writeFileSync(options.saveResultsPath, JSON.stringify(result, null, 2));
+        logger.info(`Results saved to: ${options.saveResultsPath}`);
+      }
+
+      logger.info(`Automation completed: ${result.completedSteps}/${result.totalSteps} steps successful`);
+      return result;
+
+    } catch (error) {
+      result.error = error instanceof Error ? error.message : String(error);
+      logger.error(`Automation failed: ${result.error}`);
+      return result;
+    } finally {
+      await client.close();
+    }
+  }
+
+  private async connectToChrome(): Promise<CDPClient> {
+    try {
+      // Check if Chrome is running with remote debugging
+      const versionResponse = await fetch(`http://${this.host}:${this.port}/json/version`);
+      if (!versionResponse.ok) {
+        throw new Error('Chrome is not running with remote debugging enabled. Start Chrome with --remote-debugging-port=9222');
+      }
+
+      // Get list of available targets
+      const response = await fetch(`http://${this.host}:${this.port}/json/list`);
+      const targets = await response.json() as Array<{
+        id: string;
+        type: string;
+        url: string;
+        webSocketDebuggerUrl?: string;
+        title: string;
+      }>;
+
+      const pageTargets = targets.filter(t => 
+        t.type === 'page' && t.webSocketDebuggerUrl
+      );
+      
+      if (pageTargets.length === 0) {
+        throw new Error('No page targets found. Please ensure Chrome is running with a tab open.');
+      }
+
+      // Connect to the first available page target using its webSocketDebuggerUrl
+      const client = await CDP({ 
+        target: pageTargets[0].webSocketDebuggerUrl
+      }) as unknown as CDPClient;
+      
+      return client;
+    } catch (error) {
+      throw new Error(`Failed to connect to Chrome: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async executeStep(client: CDPClient, step: AutomationStep, result: AutomationResult): Promise<void> {
+    const timeout = step.timeout || ChromeAutomation.DEFAULT_TIMEOUT;
+
+    switch (step.action) {
+      case 'navigate':
+        if (!step.url) throw new Error('Navigate step requires url');
+        await client.Page.navigate({ url: step.url });
+        await client.Page.loadEventFired();
+        break;
+
+      case 'wait':
+        if (!step.selector) throw new Error('Wait step requires selector');
+        await this.waitForSelector(client, step.selector, timeout);
+        break;
+
+      case 'click':
+        if (!step.selector) throw new Error('Click step requires selector');
+        await this.clickElement(client, step.selector);
+        break;
+
+      case 'type':
+        if (!step.selector || !step.text) throw new Error('Type step requires selector and text');
+        await this.typeInElement(client, step.selector, step.text);
+        break;
+
+      case 'toggle':
+        if (!step.selector) throw new Error('Toggle step requires selector');
+        await this.toggleElement(client, step.selector);
+        break;
+
+      case 'screenshot':
+        if (!step.path) throw new Error('Screenshot step requires path');
+        await this.takeScreenshot(client, step.path);
+        result.screenshots!.push(step.path);
+        break;
+
+      default:
+        throw new Error(`Unknown step action: ${step.action}`);
+    }
+  }
+
+  private escapeSelector(selector: string): string {
+    // Escape single quotes and backslashes for safe JavaScript string interpolation
+    return selector.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  }
+
+  private async findElementWithFallback(client: CDPClient, selector: string): Promise<{ x: number; y: number } | null> {
+    const escapedSelector = this.escapeSelector(selector);
+    
+    // Try multiple strategies to find the element
+    const strategies = [
+      // CSS selector
+      `document.querySelector('${escapedSelector}')`,
+      // Text content search for buttons
+      `Array.from(document.querySelectorAll('button')).find(el => el.textContent && el.textContent.includes('${escapedSelector.replace(/['"]/g, '')}'))`,
+      // Data attribute search
+      `document.querySelector('[data-testid="${escapedSelector.replace(/['"]/g, '')}"]')`,
+      // Aria label search
+      `document.querySelector('[aria-label*="${escapedSelector.replace(/['"]/g, '')}"]')`
+    ];
+
+    for (const strategy of strategies) {
+      try {
+        const result = await client.Runtime.evaluate({
+          expression: `
+            (function() {
+              const element = ${strategy};
+              if (!element) return null;
+              const rect = element.getBoundingClientRect();
+              if (rect.width === 0 || rect.height === 0) return null; // Element not visible
+              return {
+                x: rect.left + rect.width / 2,
+                y: rect.top + rect.height / 2,
+                strategy: '${strategy}'
+              };
+            })()
+          `
+        });
+
+        if (result.result.value) {
+          logger.info(`Element found using strategy: ${strategy}`);
+          return result.result.value;
+        }
+      } catch (error) {
+        // Continue to next strategy
+        logger.debug(`Strategy failed: ${strategy}`, error);
+      }
+    }
+
+    return null;
+  }
+
+  private async waitForSelector(client: CDPClient, selector: string, timeout: number = ChromeAutomation.DEFAULT_TIMEOUT): Promise<void> {
+    const startTime = Date.now();
+    
+    while (Date.now() - startTime < timeout) {
+      try {
+        const elementInfo = await this.findElementWithFallback(client, selector);
+        if (elementInfo) {
+          logger.info(`Element found: ${selector}`);
+          return;
+        }
+      } catch (error) {
+        // Continue waiting
+        logger.debug(`Error while waiting for selector: ${error}`);
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    throw new Error(`Timeout waiting for selector: ${selector} (tried multiple strategies)`);
+  }
+
+  private async clickElement(client: CDPClient, selector: string): Promise<void> {
+    // First ensure element exists
+    await this.waitForSelector(client, selector);
+    
+    // Try to find element with fallback strategies
+    const elementInfo = await this.findElementWithFallback(client, selector);
+    
+    if (!elementInfo) {
+      throw new Error(`Element not found with any strategy: ${selector}`);
+    }
+
+    const { x, y } = elementInfo;
+    
+    // Perform click
+    await client.Input.dispatchMouseEvent({
+      type: 'mousePressed',
+      x,
+      y,
+      button: 'left',
+      clickCount: 1
+    });
+    
+    await client.Input.dispatchMouseEvent({
+      type: 'mouseReleased',
+      x,
+      y,
+      button: 'left',
+      clickCount: 1
+    });
+
+    logger.info(`Clicked element: ${selector}`);
+  }
+
+  private async typeInElement(client: CDPClient, selector: string, text: string): Promise<void> {
+    // First click on the element to focus it
+    await this.clickElement(client, selector);
+    
+    // Clear existing content
+    await client.Input.dispatchKeyEvent({
+      type: 'keyDown',
+      key: 'Control'
+    });
+    await client.Input.dispatchKeyEvent({
+      type: 'char',
+      text: 'a'
+    });
+    await client.Input.dispatchKeyEvent({
+      type: 'keyUp',
+      key: 'Control'
+    });
+    
+    // Type the new text
+    for (const char of text) {
+      await client.Input.dispatchKeyEvent({
+        type: 'char',
+        text: char
+      });
+    }
+
+    logger.info(`Typed text in element: ${selector}`);
+  }
+
+  private async toggleElement(client: CDPClient, selector: string): Promise<void> {
+    // Simply click the toggle element
+    await this.clickElement(client, selector);
+    logger.info(`Toggled element: ${selector}`);
+  }
+
+  private async takeScreenshot(client: CDPClient, path: string): Promise<void> {
+    const screenshot = await client.Page.captureScreenshot({
+      format: 'png',
+      fullPage: true
+    });
+    
+    writeFileSync(path, screenshot.data, 'base64');
+    logger.info(`Screenshot saved: ${path}`);
+  }
+} 

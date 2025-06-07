@@ -2,12 +2,14 @@
 // Exports core functionality for Chrome debugging, log extraction, and analysis.
 
 export { ChromeExtractor } from './chrome-extractor.js';
+export { ChromeAutomation } from './chrome-automation.js';
 export { LogExtractor } from './extractor.js';
 export { ChromeErrorHandler } from './platform/chrome-error-handler.js';
 export { ReportGenerator } from './report.js';
 
 // Export types
 export type { ChromeExtractorOptions } from './chrome-extractor.js';
+export type { NavigationOptions, InteractionOptions, AutomationOptions, AutomationResult, AutomationScript, AutomationStep } from './chrome-automation.js';
 export type { ExtractorOptions, ExtractedLog } from './extractor.js';
 export type { DebugReport } from './report.js';
 

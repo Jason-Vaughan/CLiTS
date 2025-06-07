@@ -93,10 +93,31 @@ interface MockCDPClient {
     disable: Mock<[], Promise<void>>;
     entryAdded: Mock<[{ entry: DevToolsLogEntry }], void>;
   };
+  Page: {
+    enable: Mock<[], Promise<void>>;
+    disable: Mock<[], Promise<void>>;
+    navigate: Mock<[any], Promise<void>>;
+    loadEventFired: Mock<[], Promise<void>>;
+    captureScreenshot: Mock<[any], Promise<{ data: string }>>;
+  };
   Runtime: {
     enable: Mock<[], Promise<void>>;
     disable: Mock<[], Promise<void>>;
     evaluate: Mock<[any], Promise<any>>;
+    exceptionThrown: Mock<[any], void>;
+  };
+  DOM: {
+    enable: Mock<[], Promise<void>>;
+    disable: Mock<[], Promise<void>>;
+    getDocument: Mock<[], Promise<{ root: { nodeId: number } }>>;
+    querySelector: Mock<[any], Promise<{ nodeId: number }>>;
+    getBoxModel: Mock<[any], Promise<{ model: { content: number[] } }>>;
+  };
+  Input: {
+    enable: Mock<[], Promise<void>>;
+    disable: Mock<[], Promise<void>>;
+    dispatchMouseEvent: Mock<[any], Promise<void>>;
+    dispatchKeyEvent: Mock<[any], Promise<void>>;
   };
   Performance: {
     enable: Mock<[], Promise<void>>;
@@ -162,10 +183,31 @@ describe('ChromeExtractor', () => {
         disable: vi.fn().mockResolvedValue(undefined),
         entryAdded: vi.fn<[{ entry: DevToolsLogEntry }], void>()
       },
+      Page: {
+        enable: vi.fn().mockResolvedValue(undefined),
+        disable: vi.fn().mockResolvedValue(undefined),
+        navigate: vi.fn().mockResolvedValue(undefined),
+        loadEventFired: vi.fn().mockResolvedValue(undefined),
+        captureScreenshot: vi.fn().mockResolvedValue({ data: 'base64data' })
+      },
       Runtime: {
         enable: vi.fn().mockResolvedValue(undefined),
         disable: vi.fn().mockResolvedValue(undefined),
-        evaluate: vi.fn().mockResolvedValue(undefined)
+        evaluate: vi.fn().mockResolvedValue(undefined),
+        exceptionThrown: vi.fn()
+      },
+      DOM: {
+        enable: vi.fn().mockResolvedValue(undefined),
+        disable: vi.fn().mockResolvedValue(undefined),
+        getDocument: vi.fn().mockResolvedValue({ root: { nodeId: 1 } }),
+        querySelector: vi.fn().mockResolvedValue({ nodeId: 2 }),
+        getBoxModel: vi.fn().mockResolvedValue({ model: { content: [0, 0, 100, 100] } })
+      },
+      Input: {
+        enable: vi.fn().mockResolvedValue(undefined),
+        disable: vi.fn().mockResolvedValue(undefined),
+        dispatchMouseEvent: vi.fn().mockResolvedValue(undefined),
+        dispatchKeyEvent: vi.fn().mockResolvedValue(undefined)
       },
       Performance: {
         enable: vi.fn().mockResolvedValue(undefined),

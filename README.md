@@ -52,6 +52,9 @@
 
 ## Features
 
+- **Browser Automation**: Navigate to URLs, interact with elements, and run scripted automation workflows
+- **Screenshot Capture**: Take full-page screenshots during navigation and interactions
+- **Network Monitoring**: Capture network requests and responses during automation
 - Generic website inspection with automatic log collection
 - Console, network, and DOM inspection
 - Advanced Logging (Structured logging with metadata, log rotation and size management, timestamp synchronization)
@@ -146,6 +149,88 @@ Extract debugging data from files or a Chrome session.
 - `--live-mode [duration]`: Run in live mode for specified duration in seconds (default: `60`)
 - `--interactive-login`: This option is deprecated. Interactive login is now automatically handled if needed based on the selected Chrome tab.
 - `--no-login`: Bypass any login prompts and run automation as unauthenticated
+
+### `clits navigate`
+Navigate to URLs and wait for elements.
+
+**Options:**
+- `--url <url>`: Navigate to specific URL (required)
+- `--wait-for <selector>`: Wait for CSS selector to appear
+- `--timeout <ms>`: Timeout in milliseconds (default: `30000`)
+- `--screenshot <path>`: Take screenshot after navigation
+- `--chrome-host <host>`: Chrome DevTools host (default: `localhost`)
+- `--chrome-port <port>`: Chrome DevTools port (default: `9222`)
+
+**Example:**
+```sh
+clits navigate --url "http://localhost:5173/displays" --wait-for ".displays-manager" --screenshot "navigation.png"
+```
+
+### `clits interact`
+Interact with page elements.
+
+**Options:**
+- `--click <selector>`: Click on element matching CSS selector
+- `--type <selector> <text>`: Type text into input field
+- `--toggle <selector>`: Toggle switch/checkbox elements
+- `--wait-for <selector>`: Wait for element after interaction
+- `--timeout <ms>`: Timeout in milliseconds (default: `10000`)
+- `--capture-network`: Capture network requests during interaction
+- `--screenshot <path>`: Take screenshot after interaction
+- `--chrome-host <host>`: Chrome DevTools host (default: `localhost`)
+- `--chrome-port <port>`: Chrome DevTools port (default: `9222`)
+
+**Selector Strategies:**
+CLITS now supports multiple selector strategies with automatic fallback:
+- CSS selectors: `.class-name`, `#id`, `[data-testid="value"]`
+- Text content matching: `"Edit"` (finds buttons containing "Edit")
+- Data attributes: Automatically tries `[data-testid="selector"]`
+- ARIA labels: Automatically tries `[aria-label*="selector"]`
+
+**Examples:**
+```sh
+# Basic interaction with timeout
+clits interact --click "[data-testid='edit-btn']" --wait-for ".edit-dialog" --timeout 15000
+
+# Text-based selector (finds button containing "Edit")
+clits interact --click "Edit" --wait-for ".modal-dialog" --timeout 10000
+
+# Complex selector with network capture
+clits interact --toggle "input[data-field='active']" --capture-network --screenshot "toggle.png"
+```
+
+### `clits automate`
+Run automation scripts from JSON files.
+
+**Options:**
+- `--script <path>`: JSON file with automation steps (required)
+- `--monitor`: Enable monitoring during automation
+- `--save-results <path>`: Save results to file
+- `--chrome-host <host>`: Chrome DevTools host (default: `localhost`)
+- `--chrome-port <port>`: Chrome DevTools port (default: `9222`)
+
+**Automation Script Format:**
+```json
+{
+  "steps": [
+    {"action": "navigate", "url": "http://localhost:5173/displays"},
+    {"action": "wait", "selector": ".displays-manager", "timeout": 10000},
+    {"action": "click", "selector": ".edit-button"},
+    {"action": "toggle", "selector": ".toggle-switch[data-field='active']"},
+    {"action": "screenshot", "path": "after-toggle.png"}
+  ],
+  "options": {
+    "timeout": 30000,
+    "captureNetwork": true,
+    "monitor": true
+  }
+}
+```
+
+**Example:**
+```sh
+clits automate --script automation.json --monitor --save-results results.json
+```
 
 ### `clits-inspect`
 Interactive website inspector for Chrome.
