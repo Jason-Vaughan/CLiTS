@@ -187,7 +187,7 @@ export interface ChromeExtractorOptions {
     delayBetweenAttemptsMs?: number;
   };
   filters?: {
-    logLevels?: Array<'error' | 'warning' | 'info' | 'debug'>;
+    logLevels?: Array<'error' | 'warning' | 'info' | 'debug' | 'log'>;
     sources?: Array<'network' | 'console' | 'devtools' | 'websocket' | 'jwt' | 'graphql' | 'redux' | 'performance' | 'eventloop' | 'userinteraction' | 'dommutation' | 'csschange' | 'reacthook'>;
     domains?: string[];  // Domain patterns to match (e.g. ["*.google.com", "api.*"])
     keywords?: string[]; // Keywords to match in log content
@@ -248,7 +248,7 @@ export class ChromeExtractor {
         delayBetweenAttemptsMs: options.reconnect?.delayBetweenAttemptsMs ?? 2000
       },
       filters: {
-        logLevels: options.filters?.logLevels || ['error', 'warning', 'info', 'debug'],
+        logLevels: options.filters?.logLevels || ['error', 'warning', 'info', 'debug', 'log'],
         sources: options.filters?.sources || ['network', 'console', 'devtools', 'websocket', 'jwt', 'graphql', 'redux', 'performance', 'eventloop', 'userinteraction', 'dommutation', 'csschange', 'reacthook'],
         domains: options.filters?.domains || [],
         keywords: options.filters?.keywords || [],
@@ -354,7 +354,7 @@ export class ChromeExtractor {
         return false;
       }
       const level = details.level.toLowerCase();
-      const logLevel = level as 'error' | 'warning' | 'info' | 'debug';
+      const logLevel = level as 'error' | 'warning' | 'info' | 'debug' | 'log';
       if (!filters.logLevels?.includes(logLevel)) {
         return false;
       }

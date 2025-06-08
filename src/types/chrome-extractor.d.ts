@@ -15,7 +15,7 @@ export interface ChromeExtractorOptions {
     delayBetweenAttemptsMs?: number;
   };
   filters?: {
-    logLevels?: Array<'error' | 'warning' | 'info' | 'debug'>;
+    logLevels?: Array<'error' | 'warning' | 'info' | 'debug' | 'log'>;
     sources?: Array<'network' | 'console' | 'devtools'>;
     domains?: string[];
     keywords?: string[];

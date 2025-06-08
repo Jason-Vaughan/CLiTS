@@ -41,7 +41,7 @@ Examples:
     .option('--chrome-port <port>', 'Specify the port for the Chrome DevTools protocol.', '9222')
     .option('--no-network', 'Disable network log extraction from Chrome DevTools.')
     .option('--no-console', 'Disable console log extraction from Chrome DevTools.')
-    .option('--log-levels <levels>', 'Comma-separated list of log levels to include (e.g., "error,warning").', 'error,warning,info,debug')
+    .option('--log-levels <levels>', 'Comma-separated list of log levels to include (e.g., "error,warning").', 'error,warning,info,debug,log')
     .option('--sources <sources>', 'Comma-separated list of log sources to include (e.g., "network,console").', 'network,console,devtools')
     .option('--domains <domains>', 'Comma-separated list of domain patterns to filter network requests.')
     .option('--keywords <keywords>', 'Comma-separated list of keywords to filter logs.')
@@ -324,6 +324,23 @@ Examples:
         await runInspect();
       } catch (error) {
         console.error(`[CLiTS-INSPECTOR] Inspect failed: ${error instanceof Error ? error.message : String(error)}`);
+        process.exit(1);
+      }
+    });
+
+  // Direct Chrome Remote Control command - bypasses Playwright
+  program
+    .command('chrome-control')
+    .description('Direct Chrome Remote Control (no Playwright) - works with existing Chrome debugging session')
+    .option('--chrome-host <host>', 'Specify the host for the Chrome DevTools protocol', 'localhost')
+    .option('--chrome-port <port>', 'Specify the port for the Chrome DevTools protocol', '9222')
+    .action(async (options) => {
+      try {
+        // Import and run the direct Chrome control
+        const { directChromeControl } = await import('./cli-inspect.js');
+        await directChromeControl(parseInt(options.chromePort), options.chromeHost);
+      } catch (error) {
+        console.error(`[CLiTS-CHROME-CONTROL] Chrome control failed: ${error instanceof Error ? error.message : String(error)}`);
         process.exit(1);
       }
     });
