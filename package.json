@@ -1,6 +1,6 @@
 {
   "name": "@puberty-labs/clits",
-  "version": "1.0.6-beta.4",
+  "version": "1.0.6-beta.5",
   "description": "AI-First Chrome debugging tool with zero-interaction automation framework. Auto-launch Chrome, detect elements, click interactions, capture logs - all via JSON API perfect for AI assistants.",
   "type": "module",
   "main": "dist/index.js",
@@ -40,12 +40,11 @@
     "test": "vitest",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-
     "docs:generate": "typedoc"
   },
   "keywords": [
     "ai-automation",
-    "chrome-debugging", 
+    "chrome-debugging",
     "zero-interaction",
     "json-api",
     "browser-automation",
