@@ -185,3 +185,49 @@ This auto-launch functionality should be working and may be key to resolving the
   5. Chrome DevTools Protocol debugging
   6. Material-UI class pattern matching
   7. Interactive navigation testing 
+
+## Session Wrap-Up - Log Collection Testing
+
+### Findings from Log Collection Tests
+1. **Log Level Parsing Fix** ✅
+   - Successfully added 'log' level to allowed console log levels
+   - Fixed "Invalid log entry: missing or invalid level property" warnings
+   - Changes committed to git
+
+2. **Log Collection Behavior**
+   - First test (displays-manager): 0 logs collected
+   - Second test (displays-manager): 2 logs collected but filtered out
+   - Third test (settings): 0 logs collected
+   - Fourth test (settings): 0 logs collected, terminated early
+
+### Options for Next Session
+
+1. **Log Collection Enhancement**
+   - Investigate why log collection is inconsistent (0 vs 2 logs)
+   - Add debug logging to track Console.messageAdded events
+   - Consider adding a test mode that injects console.log statements
+   - Potential issue: Page might be idle during collection window
+
+2. **Network Request Tracking**
+   - Focus on network request collection instead of console logs
+   - Add specific API endpoint monitoring
+   - Track request/response timing and payload data
+   - Potential enhancement: Add request correlation IDs
+
+3. **User Interaction Recording**
+   - Implement click and navigation event recording
+   - Track DOM mutations during user interactions
+   - Add session replay capability
+   - Potential feature: Record user actions for debugging
+
+### Technical Debt Items
+- Add more comprehensive logging in ChromeExtractor
+- Improve error handling for terminated connections
+- Add retry logic for failed log collection
+- Consider adding a test mode with synthetic events
+
+### Next Steps
+1. Choose one of the three options above for next session focus
+2. Create detailed implementation plan for chosen option
+3. Set up test environment with known log-generating actions
+4. Document expected behavior and success criteria 
