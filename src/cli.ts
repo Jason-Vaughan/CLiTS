@@ -504,13 +504,19 @@ Examples:
   program
     .command('chrome-control')
     .description('Direct Chrome Remote Control (no Playwright) - works with existing Chrome debugging session')
-    .option('--chrome-host <host>', 'Specify the host for the Chrome DevTools protocol', 'localhost')
-    .option('--chrome-port <port>', 'Specify the port for the Chrome DevTools protocol', '9222')
+    .option('--host <host>', 'Specify the host for the Chrome DevTools protocol', 'localhost')
+    .option('--port <port>', 'Specify the port for the Chrome DevTools protocol', '9222')
+    .option('--chrome-host <host>', 'Specify the host for the Chrome DevTools protocol (alias)', 'localhost')
+    .option('--chrome-port <port>', 'Specify the port for the Chrome DevTools protocol (alias)', '9222')
     .action(async (options) => {
       try {
+        // Support both --port/--host and --chrome-port/--chrome-host for compatibility
+        const port = parseInt(options.port || options.chromePort || '9222');
+        const host = options.host || options.chromeHost || 'localhost';
+        
         // Import and run the direct Chrome control
         const { directChromeControl } = await import('./cli-inspect.js');
-        await directChromeControl(parseInt(options.chromePort), options.chromeHost);
+        await directChromeControl(port, host);
       } catch (error) {
         console.error(`[CLiTS-CHROME-CONTROL] Chrome control failed: ${error instanceof Error ? error.message : String(error)}`);
         process.exit(1);

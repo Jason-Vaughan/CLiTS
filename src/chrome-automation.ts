@@ -539,40 +539,72 @@ export class ChromeAutomation {
   private async findElementWithFallback(client: CDPClient, selector: string): Promise<{ x: number; y: number } | null> {
     const escapedSelector = this.escapeSelector(selector);
     
-    // Basic elements like body, html, document that always exist and should be found
+    // Basic elements that always exist and should be found without strict visibility checks
     const basicElements = ['body', 'html', 'head', 'document'];
+    
+    // Common React/HTML elements that should also get relaxed visibility handling
+    const commonElements = ['button', 'input', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div', 'span', 'a', 'form', 'textarea', 'select'];
+    
     const isBasicElement = basicElements.includes(selector.toLowerCase());
+    const isCommonElement = commonElements.includes(selector.toLowerCase()) || 
+                           selector.includes('button') || 
+                           selector.includes('input') || 
+                           selector.includes('checkbox');
     
-    logger.debug(`Finding element with selector: ${selector}, isBasicElement: ${isBasicElement}`);
+    logger.debug(`Finding element with selector: ${selector}, isBasicElement: ${isBasicElement}, isCommonElement: ${isCommonElement}`);
     
-    // Try multiple strategies to find the element
+    // Enhanced strategies for React components and Material-UI
     const strategies = [
-      // CSS selector
+      // Direct CSS selector
       `document.querySelector('${escapedSelector}')`,
-      // Text content search for buttons
-      `Array.from(document.querySelectorAll('button')).find(el => el.textContent && el.textContent.includes('${escapedSelector.replace(/['"]/g, '')}'))`,
+      // React/Material-UI button patterns
+      `document.querySelector('button${escapedSelector.startsWith('.') ? escapedSelector : '[class*="' + escapedSelector.replace(/['"]/g, '') + '"]'}')`,
+      `document.querySelector('.MuiButton-root${escapedSelector.startsWith('.') ? escapedSelector : '[class*="' + escapedSelector.replace(/['"]/g, '') + '"]'}')`,
+      // Input patterns including checkboxes
+      `document.querySelector('input[type="checkbox"]${escapedSelector.includes('checkbox') ? '' : '[class*="' + escapedSelector.replace(/['"]/g, '') + '"]'}')`,
+      `document.querySelector('input${escapedSelector.startsWith('[') ? escapedSelector : '[class*="' + escapedSelector.replace(/['"]/g, '') + '"]'}')`,
+      // Text content search for buttons and links
+      `Array.from(document.querySelectorAll('button, a, [role="button"]')).find(el => el.textContent && el.textContent.trim().includes('${escapedSelector.replace(/['"]/g, '')}'))`,
       // Data attribute search
       `document.querySelector('[data-testid="${escapedSelector.replace(/['"]/g, '')}"]')`,
+      `document.querySelector('[data-testid*="${escapedSelector.replace(/['"]/g, '')}"]')`,
       // Aria label search
-      `document.querySelector('[aria-label*="${escapedSelector.replace(/['"]/g, '')}"]')`
+      `document.querySelector('[aria-label*="${escapedSelector.replace(/['"]/g, '')}"]')`,
+      // Class-based search
+      `document.querySelector('[class*="${escapedSelector.replace(/['"]/g, '')}"]')`
     ];
 
-    for (const strategy of strategies) {
+    for (let i = 0; i < strategies.length; i++) {
+      const strategy = strategies[i];
       try {
-        // Special handling for basic elements
-        if (isBasicElement) {
+        // Relaxed handling for basic and common elements (no strict visibility checks)
+        if (isBasicElement || isCommonElement) {
           const result = await client.Runtime.evaluate({
             expression: `
               (function() {
                 try {
                   const element = ${strategy};
                   if (!element) return JSON.stringify({ error: 'element not found' });
+                  
+                  // For basic/common elements, allow elements even if not perfectly visible
                   const rect = element.getBoundingClientRect();
+                  
+                  // More lenient visibility check - just ensure element exists in DOM
+                  const style = getComputedStyle(element);
+                  if (style.display === 'none' || style.visibility === 'hidden') {
+                    return JSON.stringify({ error: 'element hidden' });
+                  }
+                  
+                  // Calculate center position, with safe fallbacks
+                  const x = rect.width > 0 ? rect.left + rect.width / 2 : rect.left + 10;
+                  const y = rect.height > 0 ? rect.top + rect.height / 2 : rect.top + 10;
+                  
                   return JSON.stringify({
-                    x: Math.max(rect.left + rect.width / 2, 100),
-                    y: Math.max(rect.top + rect.height / 2, 100),
+                    x: Math.max(x, 10),
+                    y: Math.max(y, 10),
                     strategy: '${strategy.replace(/'/g, "\\'")}',
-                    isBasicElement: true
+                    elementType: '${isBasicElement ? 'basic' : 'common'}',
+                    strategyIndex: ${i}
                   });
                 } catch (err) {
                   return JSON.stringify({ error: err.message });
@@ -580,30 +612,39 @@ export class ChromeAutomation {
               })()
             `
           });
+          
           if (result.result.value && typeof result.result.value === 'string') {
             const elementInfo = JSON.parse(result.result.value);
             if (elementInfo.error) {
-              logger.debug(`Basic element strategy failed: ${strategy} - ${elementInfo.error}`);
+              logger.debug(`Strategy ${i} failed for ${isBasicElement ? 'basic' : 'common'} element: ${strategy} - ${elementInfo.error}`);
             } else {
-              logger.info(`Basic element found using strategy: ${strategy}`, elementInfo);
+              logger.info(`Element found using strategy ${i}: ${strategy}`, elementInfo);
               return elementInfo;
             }
           } else {
-            logger.debug(`Basic element strategy failed: ${strategy} - no result value`);
+            logger.debug(`Strategy ${i} failed: ${strategy} - no result value`);
           }
         } else {
-          // Regular element handling with visibility check
+          // Strict handling for complex selectors
           const result = await client.Runtime.evaluate({
             expression: `
               JSON.stringify((function() {
                 const element = ${strategy};
                 if (!element) return null;
                 const rect = element.getBoundingClientRect();
-                if (rect.width === 0 || rect.height === 0) return null; // Element not visible
+                
+                // Strict visibility check for complex selectors
+                if (rect.width === 0 || rect.height === 0) return null;
+                
+                const style = getComputedStyle(element);
+                if (style.display === 'none' || style.visibility === 'hidden') return null;
+                
                 return {
                   x: rect.left + rect.width / 2,
                   y: rect.top + rect.height / 2,
-                  strategy: '${strategy}'
+                  strategy: '${strategy.replace(/'/g, "\\'")}',
+                  elementType: 'complex',
+                  strategyIndex: ${i}
                 };
               })())
             `
@@ -611,16 +652,19 @@ export class ChromeAutomation {
 
           if (result.result.value) {
             const elementInfo = JSON.parse(result.result.value);
-            logger.info(`Element found using strategy: ${strategy}`);
-            return elementInfo;
+            if (elementInfo) {
+              logger.info(`Element found using strategy ${i}: ${strategy}`);
+              return elementInfo;
+            }
           }
         }
       } catch (error) {
         // Continue to next strategy
-        logger.debug(`Strategy failed: ${strategy}`, error);
+        logger.debug(`Strategy ${i} failed: ${strategy}`, error);
       }
     }
 
+    logger.warn(`All strategies failed for selector: ${selector}`);
     return null;
   }
 
