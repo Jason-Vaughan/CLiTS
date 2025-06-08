@@ -233,16 +233,47 @@ clits automate --script automation.json --monitor --save-results results.json
 ```
 
 ### `clits-inspect`
-Interactive website inspector for Chrome.
+Interactive website inspector for Chrome with hierarchical element navigation.
+
+**Features:**
+- **Hierarchical Element Navigation**: Navigate through page elements organized by DOM depth levels
+- **Enhanced Element Detection**: Finds 79+ interactive elements using 53+ selector patterns including:
+  - Material-UI components (`.MuiButton-root`, `.MuiIconButton-root`, etc.)
+  - Data attributes (`[data-testid]`, `[data-cy]`, etc.)
+  - ARIA labels and roles
+  - Text-based element detection
+  - CSS class patterns (*button*, *click*, *action*, *menu*, etc.)
+
+**Navigation Controls:**
+- **↑↓ Arrow Keys**: Navigate between elements at current level
+- **→ Right Arrow**: Go deeper into DOM hierarchy (see more specific elements)
+- **← Left Arrow**: Go up in DOM hierarchy (see broader elements)
+- **Enter**: Click selected element
+- **Esc**: Exit inspector
 
 **Prompts:**
 - Website URL to inspect
 - Whether login is required (waits up to 30 seconds for manual login)
 - Select browser tab if multiple are open
+- Interactive element navigation with level indicators (Level 0/4, Level 1/4, etc.)
 - After diagnostics, choose to:
   - Capture current page state again
   - Navigate to a new URL
   - Exit
+
+**Example Navigation:**
+```
+Level 0/4: Main page elements (7 elements)
+- Dashboard (http://localhost:5173/dashboard)
+- Zones (http://localhost:5173/zones)
+- Displays Manager (http://localhost:5173/displays)
+
+Level 1/4: More specific elements (19 elements)
+- Navigation buttons, cards, form elements
+
+Level 2/4: Detailed interactive elements (25+ elements)
+- Individual buttons, links, inputs within components
+```
 
 ---
 

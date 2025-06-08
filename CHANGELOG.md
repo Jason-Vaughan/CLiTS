@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.6-beta.0] - 2025-06-08
+
+### Added
+- **Hierarchical Element Navigation**: Interactive browser navigation with level-based DOM traversal using arrow keys
+- **Enhanced Element Detection**: 53+ comprehensive selector patterns including Material-UI, data-testid, aria-label, and text-based detection
+- **Direct CDP Clicking**: Improved click reliability with multiple fallback strategies and direct Chrome DevTools Protocol integration
+- **Auto-Launch Chrome**: Automatic Chrome detection and launch with proper debugging flags on macOS
+- **Advanced React Monitoring**: Component lifecycle tracking, hook monitoring, and prop change detection
+- **Network Analysis**: Request/response correlation, WebSocket tracking, JWT token monitoring, and GraphQL support
+- **State Management**: Redux state visualization, state change tracking, and middleware debugging
+- **Performance Monitoring**: React render metrics, memory usage tracking, and event loop monitoring
+- **User Interaction Recording**: DOM mutation tracking, CSS change monitoring, and user interaction recording
+
+### Fixed
+- **Log Level Validation**: Fixed "Invalid log entry: missing or invalid level property" warnings for console.log messages
+- **Chrome Tab Connection**: Fixed connection mismatch between element detection and clicking operations
+- **JavaScript Injection**: Resolved template literal escaping issues in Chrome evaluation scripts
+- **CDP Input Domain**: Removed invalid Input.enable() calls that caused compatibility issues
+- **Material-UI Filtering**: Enhanced class filtering with comprehensive regex pattern blocking
+
+### Changed
+- **Element Detection**: Now finds 79+ interactive elements on pages vs previous basic detection
+- **Navigation UI**: Increased page size to show more elements (20 vs 15) with clear level indicators
+- **Error Handling**: Improved error context and recovery throughout the application
+- **Connection Stability**: Enhanced reconnection logic for Chrome browser refreshes and tab changes
+
 ## [1.0.0] - 2024-06-05
 
 ### Added

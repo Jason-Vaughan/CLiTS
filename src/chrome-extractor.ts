@@ -361,7 +361,16 @@ export class ChromeExtractor {
     }
 
     // Check source
-    const source = log.type as 'network' | 'console' | 'devtools' | 'websocket' | 'jwt' | 'graphql' | 'redux' | 'performance' | 'eventloop' | 'userinteraction' | 'dommutation' | 'csschange';
+    // Map log types to source categories for filtering
+    let source: 'network' | 'console' | 'devtools' | 'websocket' | 'jwt' | 'graphql' | 'redux' | 'performance' | 'eventloop' | 'userinteraction' | 'dommutation' | 'csschange' | 'reacthook';
+    if (log.type === 'log') {
+      source = 'devtools'; // Map 'log' type to 'devtools' source
+    } else if (log.type === 'credential') {
+      source = 'console'; // Map 'credential' type to 'console' source  
+    } else {
+      source = log.type as 'network' | 'console' | 'devtools' | 'websocket' | 'jwt' | 'graphql' | 'redux' | 'performance' | 'eventloop' | 'userinteraction' | 'dommutation' | 'csschange' | 'reacthook';
+    }
+    
     if (!filters.sources?.includes(source)) {
       return false;
     }
