@@ -1,16 +1,33 @@
 #!/usr/bin/env node
 
-
+import { Command } from 'commander';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
 import ora from 'ora';
 import { spawn } from 'child_process';
 import os from 'os';
-
-
 import fetch from 'node-fetch';
 
+// Add command-line argument parsing for AI automation
+const program = new Command();
 
+program
+  .name('clits-inspect')
+  .description('AI-First Chrome Inspector with automation capabilities')
+  .version('1.0.6-beta.2')
+  .option('--url <url>', 'Navigate to specific URL automatically')
+  .option('--auto', 'Run in fully automated mode (no prompts)')
+  .option('--json', 'Output structured JSON for AI consumption')
+  .option('--verbose', 'Enable verbose logging for debugging automation workflows')
+  .option('--action <action>', 'Specific action: logs|navigate|click', 'logs')
+  .option('--selector <selector>', 'CSS selector to click (for click action)')
+  .option('--duration <seconds>', 'Log collection duration in seconds', '15')
+  .option('--port <port>', 'Chrome debugging port', '9222')
+  .option('--host <host>', 'Chrome debugging host', 'localhost')
+  .option('--target-priority <priority>', 'Auto-select target: localhost|dev|newest|largest', 'localhost')
+  .parse();
+
+const options = program.opts();
 
 async function checkChromeConnection(): Promise<boolean> {
   try {
@@ -23,10 +40,17 @@ async function checkChromeConnection(): Promise<boolean> {
 
 async function launchChromeIfNeeded(): Promise<void> {
   const isChrome = await checkChromeConnection();
-  if (isChrome) return;
+  if (isChrome) {
+    if (options.verbose) console.log(chalk.green('✅ Chrome already running with remote debugging'));
+    return;
+  }
 
   if (os.platform() === 'darwin') {
-    console.log(chalk.yellow('\nChrome is not running with remote debugging. Launching Chrome for you...'));
+    if (!options.verbose) {
+      console.log(chalk.yellow('\nChrome is not running with remote debugging. Launching Chrome for you...'));
+    } else {
+      console.log(chalk.yellow('🚀 Chrome not detected, auto-launching...'));
+    }
     const chromePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
     const args = [
       '--remote-debugging-port=9222',
@@ -34,18 +58,109 @@ async function launchChromeIfNeeded(): Promise<void> {
       '--no-first-run',
       '--no-default-browser-check'
     ];
+    if (options.verbose) {
+      console.log(chalk.gray(`Chrome path: ${chromePath}`));
+      console.log(chalk.gray(`Chrome args: ${args.join(' ')}`));
+    }
     spawn(chromePath, args, {
       detached: true,
       stdio: 'ignore'
     }).unref();
     // Wait a few seconds for Chrome to start
+    if (options.verbose) console.log(chalk.blue('⏳ Waiting 4s for Chrome to start...'));
     await new Promise(resolve => setTimeout(resolve, 4000));
+    if (options.verbose) console.log(chalk.green('✅ Chrome launch complete'));
   } else {
     throw new Error('Auto-launch is only supported on macOS. Please start Chrome manually.');
   }
 }
 
-
+async function autoSelectTarget(): Promise<any> {
+  if (options.verbose) console.log(chalk.blue(`🔗 Fetching targets from http://${options.host}:${options.port}/json/list`));
+  const response = await fetch(`http://${options.host}:${options.port}/json/list`);
+  const targets = await response.json() as Array<{
+    id: string;
+    type: string;
+    url: string;
+    title: string;
+    webSocketDebuggerUrl?: string;
+  }>;
+  
+  const pageTargets = targets.filter((t: any) => t.type === 'page');
+  if (options.verbose) console.log(chalk.gray(`Found ${targets.length} total targets, ${pageTargets.length} page targets`));
+  
+  if (pageTargets.length === 0) {
+    throw new Error('No Chrome page targets found. Please open a tab in Chrome with --remote-debugging-port=9222');
+  }
+  
+  if (pageTargets.length === 1) {
+    if (options.verbose) console.log(chalk.green('Only one target available, selecting it'));
+    return pageTargets[0];
+  }
+  
+  // AI-friendly target selection logic
+  const priority = options.targetPriority || 'localhost';
+  if (options.verbose) {
+    console.log(chalk.blue(`🎯 Multiple targets found, using priority: ${priority}`));
+    pageTargets.forEach((t, i) => {
+      console.log(chalk.gray(`  ${i+1}. ${t.title} - ${t.url}`));
+    });
+  }
+  
+  switch (priority) {
+    case 'localhost': {
+      // Prefer localhost/development URLs
+      const localTargets = pageTargets.filter(t => 
+        t.url.includes('localhost') || 
+        t.url.includes('127.0.0.1') || 
+        t.url.includes('local') ||
+        t.url.startsWith('http://localhost') ||
+        t.url.startsWith('https://localhost')
+      );
+      if (localTargets.length > 0) {
+        if (options.verbose) console.log(chalk.green(`✅ Found ${localTargets.length} localhost target(s), selecting first`));
+        return localTargets[0];
+      }
+      break;
+    }
+      
+    case 'dev': {
+      // Prefer development-related URLs
+      const devTargets = pageTargets.filter(t => 
+        t.url.includes('dev') || 
+        t.url.includes('staging') || 
+        t.url.includes('test') ||
+        t.title.toLowerCase().includes('dev')
+      );
+      if (devTargets.length > 0) {
+        if (options.verbose) console.log(chalk.green(`✅ Found ${devTargets.length} dev target(s), selecting first`));
+        return devTargets[0];
+      }
+      break;
+    }
+      
+    case 'newest':
+      // Return the most recently opened (last in list)
+      if (options.verbose) console.log(chalk.green('✅ Selecting newest (last) target'));
+      return pageTargets[pageTargets.length - 1];
+      
+    case 'largest':
+      // Prefer targets with longer URLs (likely more complex apps)
+      if (options.verbose) console.log(chalk.green('✅ Selecting target with longest URL'));
+      return pageTargets.sort((a, b) => b.url.length - a.url.length)[0];
+  }
+  
+  // Filter out chrome:// URLs as fallback
+  const nonChromeTargets = pageTargets.filter(t => !t.url.startsWith('chrome://'));
+  if (nonChromeTargets.length > 0) {
+    if (options.verbose) console.log(chalk.yellow('⚠️  Priority selection failed, using first non-chrome:// target'));
+    return nonChromeTargets[0];
+  }
+  
+  // Last resort: return first available
+  if (options.verbose) console.log(chalk.yellow('⚠️  Fallback: selecting first available target'));
+  return pageTargets[0];
+}
 
 // Removed unused buildElementHierarchy function - replaced by buildElementHierarchyDirect
 
@@ -53,9 +168,115 @@ async function launchChromeIfNeeded(): Promise<void> {
 
 // Removed unused chromeRemoteControl function that depended on Playwright
 
-
+let mainExecuted = false;
 
 export async function main() {
+  if (mainExecuted) {
+    if (options.verbose) console.log(chalk.yellow('⚠️  Main function already executed, skipping...'));
+    return;
+  }
+  mainExecuted = true;
+  
+  // AI Automation Mode vs Interactive Mode
+  if (options.auto || options.url || options.json) {
+    await aiAutomationMode();
+  } else {
+    await interactiveMode();
+  }
+}
+
+async function aiAutomationMode() {
+  const result: any = {
+    success: false,
+    action: options.action,
+    timestamp: new Date().toISOString(),
+    target: null,
+    logs: [],
+    elements: [],
+    error: null
+  };
+
+  try {
+    if (options.verbose) {
+      console.log(chalk.blue('🤖 Starting AI automation mode'));
+      console.log(chalk.gray(`Action: ${options.action}`));
+      console.log(chalk.gray(`URL: ${options.url || 'none'}`));
+      console.log(chalk.gray(`Selector: ${options.selector || 'none'}`));
+      console.log(chalk.gray(`Duration: ${options.duration}s`));
+      console.log(chalk.gray(`Target Priority: ${options.targetPriority}`));
+    }
+    
+    // Launch Chrome if needed
+    if (options.verbose) console.log(chalk.blue('🔍 Checking Chrome connection...'));
+    await launchChromeIfNeeded();
+    
+    // Auto-select target
+    if (options.verbose) console.log(chalk.blue('🎯 Auto-selecting Chrome target...'));
+    const target = await autoSelectTarget();
+    result.target = target;
+    if (options.verbose) {
+      console.log(chalk.green(`✅ Selected target: ${target.title}`));
+      console.log(chalk.gray(`URL: ${target.url}`));
+    }
+    
+    // Navigate to URL if specified
+    if (options.url) {
+      if (options.verbose) console.log(chalk.blue(`🧭 Navigating to: ${options.url}`));
+      await navigateToUrl(target.id, options.url);
+      if (options.verbose) console.log(chalk.green('✅ Navigation complete'));
+    }
+    
+    // Execute action
+    if (options.verbose) console.log(chalk.blue(`⚡ Executing action: ${options.action}`));
+    switch (options.action) {
+      case 'logs':
+        if (options.verbose) console.log(chalk.blue('📊 Collecting logs...'));
+        result.logs = await collectLogsFromTarget(target.id);
+        if (options.verbose) console.log(chalk.green(`✅ Collected ${result.logs.length} logs`));
+        break;
+      case 'navigate':
+        if (options.verbose) console.log(chalk.blue('🗺️  Building element hierarchy...'));
+        result.elements = await buildElementHierarchyDirect(target.id, parseInt(options.port), options.host);
+        if (options.verbose) console.log(chalk.green(`✅ Found ${result.elements.length} interactive elements`));
+        break;
+      case 'click':
+        if (options.selector) {
+          if (options.verbose) console.log(chalk.blue(`👆 Clicking element: ${options.selector}`));
+          await clickElementDirect(target.id, options.selector, parseInt(options.port), options.host);
+          if (options.verbose) console.log(chalk.green('✅ Click successful, collecting logs...'));
+          result.logs = await collectLogsFromTarget(target.id);
+          if (options.verbose) console.log(chalk.green(`✅ Collected ${result.logs.length} logs after click`));
+        } else {
+          throw new Error('--selector required for click action');
+        }
+        break;
+    }
+    
+    result.success = true;
+    if (options.verbose && !options.json) {
+      console.log(chalk.green('🎉 Automation workflow completed successfully!'));
+    }
+  } catch (error) {
+    result.error = error instanceof Error ? error.message : String(error);
+    if (options.verbose && !options.json) {
+      console.log(chalk.red('💥 Automation workflow failed:'), error);
+    }
+  }
+  
+  if (options.json) {
+    console.log(JSON.stringify(result, null, 2));
+  } else {
+    if (result.success) {
+      console.log(chalk.green('✅ Automation complete'));
+    } else {
+      console.log(chalk.red('❌ Automation failed:'), result.error);
+    }
+  }
+  
+  process.exit(result.success ? 0 : 1);
+}
+
+async function interactiveMode() {
   console.log(chalk.blue('\nCLiTS - Chrome Log Inspector & Troubleshooting System'));
   console.log(chalk.gray('Interactive Website Inspector with Chrome Remote Control\n'));
 
@@ -179,7 +400,7 @@ async function integratedInspectSession(): Promise<void> {
   }
 }
 
-async function collectLogsFromTarget(targetId: string, wait: boolean = true): Promise<void> {
+async function collectLogsFromTarget(targetId: string, wait: boolean = true): Promise<any[]> {
   const { ChromeExtractor } = await import('./chrome-extractor.js');
   
   const spinner = ora('Starting log collection...').start();
@@ -213,13 +434,15 @@ async function collectLogsFromTarget(targetId: string, wait: boolean = true): Pr
       spinner.succeed(`Log collection complete! Collected ${logs.length} logs`);
     }
     
-    if (logs.length > 0) {
+    if (logs.length > 0 && !options.json) {
       console.log(chalk.green(`\n📊 Collected ${logs.length} logs:`));
       console.log(JSON.stringify(logs, null, 2));
-    } else {
+    } else if (logs.length === 0 && !options.json) {
       console.log(chalk.yellow('\n📊 No logs collected during this session'));
       console.log(chalk.gray('Try interacting with the page to generate logs'));
     }
+    
+    return logs;
     
   } catch (error) {
     if (wait) {
@@ -227,6 +450,7 @@ async function collectLogsFromTarget(targetId: string, wait: boolean = true): Pr
     } else {
       console.log(chalk.red(`Background log collection failed: ${error instanceof Error ? error.message : String(error)}`));
     }
+    return [];
   }
 }
 
@@ -571,4 +795,12 @@ async function clickElementDirect(targetId: string, selector: string, port: numb
   } finally {
     await client.close();
   }
-} 
+}
+
+// Entry point: Only run main if this file is executed directly
+if (process.argv[1]?.includes('cli-inspect')) {
+  main().catch(error => {
+    console.error(chalk.red('Fatal error:'), error);
+    process.exit(1);
+  });
+}

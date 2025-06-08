@@ -193,6 +193,9 @@ This auto-launch functionality should be working and may be key to resolving the
 - [x] **BREAKTHROUGH**: Built complete AI automation framework
 - [x] **BREAKTHROUGH**: Published v1.0.6-beta.0 to NPM with AI capabilities
 - [x] **BREAKTHROUGH**: Fully automated workflow for AI assistants
+- [x] **NEW**: Added --verbose flag for debugging automation workflows (v1.0.6-beta.2)
+- [x] **NEW**: Fixed duplicate execution issue with entry point guard
+- [x] **NEW**: Published v1.0.6-beta.2 with enhanced debugging capabilities
 
 ### **AI Automation Framework Features**
 **Complete Command Arsenal for AI:**
@@ -208,11 +211,16 @@ clits-inspect --auto --json --action click --selector "http://localhost:5173/set
 
 # Navigate to specific URL + detect elements
 clits-inspect --auto --json --url "http://localhost:3000" --action navigate
+
+# VERBOSE MODE for debugging automation workflows
+clits-inspect --auto --verbose --action logs
+clits-inspect --auto --json --verbose --action navigate
 ```
 
 **AI Command Options:**
 - `--auto`: Zero human interaction required
 - `--json`: Structured JSON output perfect for AI parsing
+- `--verbose`: **NEW** - Detailed debugging output for troubleshooting automation workflows
 - `--action`: logs|navigate|click
 - `--url`: Auto-navigate to specific URL
 - `--selector`: CSS selector or URL to click
@@ -224,6 +232,7 @@ clits-inspect --auto --json --url "http://localhost:3000" --action navigate
 1. **✅ Automated Log Collection**: Collected 8 network logs + filtered console logs
 2. **✅ Automated Element Detection**: Found 44 interactive elements including navigation
 3. **✅ Automated Clicking**: Successfully clicked Settings link, triggered navigation + captured 12 network logs
+4. **✅ Verbose Debugging**: Detailed step-by-step output for troubleshooting automation workflows
 
 ### **AI Integration Benefits**
 - **Auto-launch Chrome**: Detects if Chrome running, launches with debug flags if needed
@@ -231,6 +240,7 @@ clits-inspect --auto --json --url "http://localhost:3000" --action navigate
 - **Structured Output**: JSON format perfect for AI parsing and decision making
 - **Action Chaining**: Can navigate → detect elements → click → capture logs in sequence
 - **Error Handling**: Graceful failures with structured error responses
+- **Debugging Support**: **NEW** - Verbose mode shows detailed workflow steps for troubleshooting
 
 ### **CLiTS is Now AI-First!**
 The framework enables full closed-loop debugging:
@@ -243,7 +253,16 @@ The framework enables full closed-loop debugging:
 7. **AI interprets results** and repeats cycle
 
 **Ready for production AI assistant integration!**
-   - Fourth test (settings): 0 logs collected, terminated early
+
+### **Latest Version: 1.0.6-beta.2**
+**New Features:**
+- `--verbose` flag for detailed debugging output
+- Fixed duplicate execution issue
+- Enhanced automation workflow visibility
+- Better error reporting and troubleshooting
+
+**Perfect for CissorCLITS Integration:**
+The other AI workspace feedback was spot-on - the automation framework is exactly what's needed for AI assistant integration. The new `--verbose` flag addresses their suggestion for debugging capabilities during development and troubleshooting.
 
 ## ✅ COMPLETED - Session Cleanup for Beta Release
 
