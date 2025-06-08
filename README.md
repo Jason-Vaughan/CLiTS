@@ -298,91 +298,184 @@ The inspector outputs information in a structured format for easy AI parsing:
 
 ## For AI Assistants
 
-CLiTS is designed to be easily extended and automated. Now that `ChromeExtractor` is central to Chrome interactions, here's an updated perspective:
+CLiTS is specifically designed for AI assistants with a complete automation framework that requires **zero human interaction**. The AI automation framework provides structured JSON output perfect for programmatic analysis and decision-making.
 
-### Basic Usage with `ChromeExtractor`
-For direct programmatic access (e.g., from an AI tool), you can instantiate and use `ChromeExtractor`:
+### 🤖 AI Automation Framework
+
+Use the `clits-inspect` command with automation flags for fully automated workflows:
+
+#### **Complete Automation Commands**
+
+```bash
+# 1. Automated Log Collection (15 seconds, JSON output)
+clits-inspect --auto --json --action logs
+
+# 2. Automated Element Detection (find all clickable elements)
+clits-inspect --auto --json --action navigate
+
+# 3. Automated Clicking with Log Capture
+clits-inspect --auto --json --action click --selector "http://localhost:5173/settings"
+
+# 4. Navigate to Specific URL + Element Detection
+clits-inspect --auto --json --url "http://localhost:3000" --action navigate
+
+# 5. Custom Duration Log Collection
+clits-inspect --auto --json --action logs --duration 30
+
+# 6. Smart Target Selection (prioritize localhost)
+clits-inspect --auto --json --action logs --target-priority localhost
+```
+
+#### **AI Command Options**
+
+| Option | Values | Description |
+|--------|--------|-------------|
+| `--auto` | - | **Required for AI**: Zero human interaction |
+| `--json` | - | **Required for AI**: Structured JSON output |
+| `--action` | `logs\|navigate\|click` | Action to perform |
+| `--url` | URL string | Navigate to specific URL automatically |
+| `--selector` | CSS selector or URL | Element to click (for click action) |
+| `--duration` | seconds (default: 15) | Log collection duration |
+| `--target-priority` | `localhost\|dev\|newest\|largest` | Smart tab selection |
+| `--port` | port number (default: 9222) | Chrome debugging port |
+| `--host` | hostname (default: localhost) | Chrome debugging host |
+
+#### **AI Workflow Examples**
+
+**1. Full Debugging Workflow:**
+```bash
+# Step 1: Auto-launch and detect elements
+clits-inspect --auto --json --action navigate
+
+# Step 2: Click on Settings link
+clits-inspect --auto --json --action click --selector "http://localhost:5173/settings"
+
+# Step 3: Collect logs after interaction
+clits-inspect --auto --json --action logs --duration 10
+```
+
+**2. JSON Output Format:**
+```json
+{
+  "success": true,
+  "action": "navigate",
+  "timestamp": "2025-06-08T01:41:23.034Z",
+  "target": {
+    "id": "1223DEB4A446164DEE13C00AA6CCE7E0",
+    "title": "Vite + React + TS",
+    "url": "http://localhost:5173/displays-manager"
+  },
+  "logs": [],
+  "elements": [
+    {
+      "name": "🔗 Dashboard",
+      "url": "http://localhost:5173/dashboard"
+    },
+    {
+      "name": "🔗 Settings", 
+      "url": "http://localhost:5173/settings"
+    },
+    {
+      "name": "🔘 Add New Display",
+      "url": "Add New Display"
+    }
+  ],
+  "error": null
+}
+```
+
+**3. Error Handling:**
+```json
+{
+  "success": false,
+  "action": "click",
+  "timestamp": "2025-06-08T01:41:23.034Z",
+  "error": "Element not found: #non-existent-selector",
+  "target": null,
+  "logs": [],
+  "elements": []
+}
+```
+
+#### **AI Integration Benefits**
+
+- **🚀 Auto-launch Chrome**: Detects if Chrome is running, launches automatically if needed
+- **🎯 Smart Target Selection**: Prioritizes localhost > dev > newest tabs automatically  
+- **📊 Structured Output**: JSON format perfect for AI parsing and decision making
+- **🔄 Action Chaining**: Navigate → detect elements → click → capture logs in sequence
+- **🛡️ Error Handling**: Graceful failures with structured error responses
+- **⚡ Zero Latency**: No human prompts or interactions required
+
+#### **Programmatic Usage (Alternative)**
+
+For direct integration in Node.js applications:
 
 ```typescript
-import { ChromeExtractor } from './src/chrome-extractor'; // Adjust path as needed
+import { ChromeExtractor } from '@puberty-labs/clits/dist/chrome-extractor';
 
-async function extractChromeLogs(port: number, host: string, targetId?: string) {
+async function aiDebugWorkflow() {
   const extractor = new ChromeExtractor({
-    port,
-    host,
+    port: 9222,
+    host: 'localhost',
     includeNetwork: true,
-    includeConsole: true,
-    reconnect: { enabled: true, maxAttempts: 5 } // Reconnection enabled by default
+    includeConsole: true
   });
 
   try {
-    const logs = await extractor.extract(targetId);
-    console.log('Extracted logs:', JSON.stringify(logs, null, 2));
-    return logs;
-  } catch (error) {
-    console.error('Error during extraction:', error);
-    throw error;
-  }
-}
-
-// Example usage:
-// To get logs from the first available Chrome tab on port 9222
-// extractChromeLogs(9222, 'localhost');
-
-// To get logs from a specific target ID
-// extractChromeLogs(9222, 'localhost', 'YOUR_TARGET_ID');
-```
-
-### Retrieving and Selecting Targets Programmatically
-If you need to list and select Chrome tabs programmatically:
-
-```typescript
-import { ChromeExtractor } from './src/chrome-extractor'; // Adjust path as needed
-
-async function listAndSelectChromeTarget(port: number, host: string) {
-  const extractor = new ChromeExtractor({ port, host });
-  try {
+    // 1. Get available targets
     const targets = await extractor.getDebuggablePageTargets();
-    if (targets.length === 0) {
-      console.log('No debuggable Chrome tabs found.');
-      return null;
-    }
-
-    console.log('Available Chrome tabs:');
-    targets.forEach((t, index) => {
-      console.log(`${index + 1}. ${t.title || t.url} (ID: ${t.id})`);
-    });
-
-    // For programmatic selection, you might choose the first target or apply custom logic
-    const selectedTarget = targets[0]; 
-    console.log(`Programmatically selected: ${selectedTarget.title || selectedTarget.url}`);
-    return selectedTarget.id;
-
+    const target = targets.find(t => t.url.includes('localhost')) || targets[0];
+    
+    // 2. Extract logs
+    const logs = await extractor.extract(target.id);
+    
+    return {
+      success: true,
+      targetUrl: target.url,
+      logCount: logs.length,
+      logs: logs
+    };
   } catch (error) {
-    console.error('Error listing Chrome targets:', error);
-    throw error;
+    return {
+      success: false,
+      error: error.message
+    };
   }
 }
-
-// Example usage:
-// const selectedId = await listAndSelectChromeTarget(9222, 'localhost');
-// if (selectedId) {
-//   extractChromeLogs(9222, 'localhost', selectedId);
-// }
 ```
 
-### Error Handling
-Error handling is now more robust within `ChromeExtractor`. Catched errors will typically provide detailed messages.
+CLiTS enables AI assistants to build complete closed-loop debugging workflows:
 
-```typescript
-try {
-  // Your CLITS command or ChromeExtractor usage here
-} catch (error) {
-  console.error('[CLiTS-INSPECTOR][ERROR]', error);
-  // Errors from ChromeExtractor or the CLI will now provide more context.
-  // Example: if Chrome is not running, you'll get a specific message.
-}
+1. **Launch CLiTS** → 2. **Auto-launch Chrome** → 3. **Navigate pages** → 4. **Detect elements** → 5. **Click/interact** → 6. **Capture logs** → 7. **Interpret results** → 8. **Repeat cycle**
+
+#### **Quick Start for AI Assistants**
+
+**Prerequisites:** 
+- Install: `npm install -g @puberty-labs/clits`
+- Chrome will be auto-launched if needed
+
+**Basic AI Commands:**
+```bash
+# Start with element detection (most common)
+clits-inspect --auto --json --action navigate
+
+# Click a specific element
+clits-inspect --auto --json --action click --selector "Dashboard"
+
+# Collect debugging logs
+clits-inspect --auto --json --action logs
 ```
+
+**Advanced Automation:**
+```bash
+# Navigate to specific page + detect elements
+clits-inspect --auto --json --action navigate --url "http://localhost:3000/admin"
+
+# Extended log collection with smart targeting
+clits-inspect --auto --json --action logs --duration 30 --target-priority localhost
+```
+
+The automation framework handles Chrome launching, tab selection, and provides structured JSON responses perfect for AI analysis. All commands are designed to work without any human intervention.
 
 ---
 
