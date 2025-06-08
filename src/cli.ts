@@ -25,8 +25,11 @@ Examples:
   $ clits extract --chrome --interactive
   $ clits extract --source ./logs --patterns "*.log" --output-file ./output.json
   $ clits navigate --url "http://localhost:5173/displays" --wait-for ".displays-manager"
+  $ clits navigate --link-text "Display Manager" --wait-for ".displays-manager"
+  $ clits navigate --url-contains "display" --screenshot "navigation.png"
   $ clits interact --click "[data-testid='edit-btn']" --wait-for ".edit-dialog" --capture-network
   $ clits automate --script automation.json --monitor --save-results results.json
+  $ clits discover-links --chrome-port 9222
     `);
 
   program
@@ -196,7 +199,9 @@ Examples:
   program
     .command('navigate')
     .description('Navigate to URLs and wait for elements')
-    .requiredOption('--url <url>', 'Navigate to specific URL')
+    .option('--url <url>', 'Navigate to specific URL')
+    .option('--link-text <text>', 'Navigate by finding link with matching text (fuzzy matching)')
+    .option('--url-contains <pattern>', 'Navigate by finding link with URL containing pattern')
     .option('--wait-for <selector>', 'Wait for CSS selector to appear')
     .option('--timeout <ms>', 'Timeout in milliseconds', '30000')
     .option('--screenshot <path>', 'Take screenshot after navigation')
@@ -204,12 +209,105 @@ Examples:
     .option('--chrome-port <port>', 'Specify the port for the Chrome DevTools protocol', '9222')
     .action(async (options) => {
       try {
+        // Validate that at least one navigation method is provided
+        if (!options.url && !options.linkText && !options.urlContains) {
+          console.error('[CLiTS-NAVIGATOR] Error: Must specify one of --url, --link-text, or --url-contains');
+          process.exit(1);
+        }
+        
+        // If using link-text or url-contains, use clits-inspect to find and navigate
+        if (options.linkText || options.urlContains) {
+          const { spawn } = await import('child_process');
+          const { fileURLToPath } = await import('url');
+          const { dirname, resolve } = await import('path');
+          
+          // Build the clits-inspect command
+          const __filename = fileURLToPath(import.meta.url);
+          const __dirname = dirname(__filename);
+          const inspectPath = resolve(__dirname, 'cli-inspect.js');
+          
+                     const args = [
+             inspectPath,
+             '--auto',
+             '--json',
+             '--port', options.chromePort,
+             '--host', options.chromeHost
+           ];
+          
+          if (options.linkText) {
+            args.push('--action', 'navigate-by-text', '--link-text', options.linkText);
+          } else if (options.urlContains) {
+            args.push('--action', 'navigate-by-url', '--url-contains', options.urlContains);
+          }
+          
+          const inspectProcess = spawn('node', args, { stdio: 'pipe' });
+          
+          let output = '';
+          let error = '';
+          
+          inspectProcess.stdout.on('data', (data) => {
+            output += data.toString();
+          });
+          
+          inspectProcess.stderr.on('data', (data) => {
+            error += data.toString();
+          });
+          
+          inspectProcess.on('close', async (code) => {
+            if (code === 0) {
+              try {
+                const result = JSON.parse(output);
+                if (result.success && result.navigated) {
+                  console.log(`[CLiTS-NAVIGATOR] Successfully navigated via ${result.navigated.method}: ${result.navigated.text} -> ${result.navigated.url}`);
+                  
+                                     // If wait-for or screenshot options are provided, handle them with ChromeAutomation
+                   if (options.waitFor || options.screenshot) {
+                     const automation = new ChromeAutomation(
+                       parseInt(options.chromePort),
+                       options.chromeHost
+                     );
+                     
+                     // Use current URL since we already navigated
+                     await automation.navigate({
+                       url: result.navigated.url,
+                       waitForSelector: options.waitFor,
+                       timeout: parseInt(options.timeout),
+                       screenshotPath: options.screenshot,
+                       chromePort: parseInt(options.chromePort),
+                       chromeHost: options.chromeHost
+                     });
+                     
+                     if (options.waitFor) {
+                       console.log(`[CLiTS-NAVIGATOR] Element found: ${options.waitFor}`);
+                     }
+                     if (options.screenshot) {
+                       console.log(`[CLiTS-NAVIGATOR] Screenshot saved: ${options.screenshot}`);
+                     }
+                   }
+                } else {
+                  console.error(`[CLiTS-NAVIGATOR] Navigation failed: ${result.error || 'Unknown error'}`);
+                  process.exit(1);
+                }
+              } catch (parseError) {
+                console.error('[CLiTS-NAVIGATOR] Failed to parse navigation result:', output);
+                process.exit(1);
+              }
+            } else {
+              console.error('[CLiTS-NAVIGATOR] Navigation failed:', error);
+              process.exit(1);
+            }
+          });
+          
+          return;
+        }
+
+        // Traditional URL-based navigation
         const automation = new ChromeAutomation(
           parseInt(options.chromePort),
           options.chromeHost
         );
 
-        await automation.navigate({
+        const navigationResult = await automation.navigate({
           url: options.url,
           waitForSelector: options.waitFor,
           timeout: parseInt(options.timeout),
@@ -218,7 +316,7 @@ Examples:
           chromeHost: options.chromeHost
         });
 
-        console.log(`[CLiTS-NAVIGATOR] Successfully navigated to: ${options.url}`);
+        console.log(`[CLiTS-NAVIGATOR] Successfully navigated to: ${navigationResult.actualUrl}`);
       } catch (error) {
         console.error(`[CLiTS-NAVIGATOR] Navigation failed: ${error instanceof Error ? error.message : String(error)}`);
         process.exit(1);
@@ -233,7 +331,7 @@ Examples:
     .option('--type <selector> <text>', 'Type text into input field')
     .option('--toggle <selector>', 'Toggle switch/checkbox elements')
     .option('--wait-for <selector>', 'Wait for element after interaction')
-    .option('--timeout <ms>', 'Timeout in milliseconds', '10000')
+    .option('--timeout <ms>', 'Timeout in milliseconds', '30000')
     .option('--capture-network', 'Capture network requests during interaction')
     .option('--screenshot <path>', 'Take screenshot after interaction')
     .option('--chrome-host <host>', 'Specify the host for the Chrome DevTools protocol', 'localhost')
@@ -328,6 +426,80 @@ Examples:
       }
     });
 
+  // Discover Links command - convenience command for discovering navigation links
+  program
+    .command('discover-links')
+    .description('Discover all navigation links on the current page')
+    .option('--chrome-host <host>', 'Specify the host for the Chrome DevTools protocol', 'localhost')
+    .option('--chrome-port <port>', 'Specify the port for the Chrome DevTools protocol', '9222')
+    .option('--verbose', 'Enable verbose output')
+    .action(async (options) => {
+      try {
+        const { spawn } = await import('child_process');
+        const { fileURLToPath } = await import('url');
+        const { dirname, resolve } = await import('path');
+        
+        // Build the clits-inspect command
+        const __filename = fileURLToPath(import.meta.url);
+        const __dirname = dirname(__filename);
+        const inspectPath = resolve(__dirname, 'cli-inspect.js');
+        
+        const args = [
+          inspectPath,
+          '--auto',
+          '--json',
+          '--action', 'discover-links',
+          '--port', options.chromePort,
+          '--host', options.chromeHost
+        ];
+        
+        if (options.verbose) {
+          args.push('--verbose');
+        }
+        
+        const inspectProcess = spawn('node', args, { stdio: 'pipe' });
+        
+        let output = '';
+        let error = '';
+        
+        inspectProcess.stdout.on('data', (data) => {
+          output += data.toString();
+        });
+        
+        inspectProcess.stderr.on('data', (data) => {
+          error += data.toString();
+        });
+        
+        inspectProcess.on('close', (code) => {
+          if (code === 0) {
+            try {
+              const result = JSON.parse(output);
+              if (result.success && result.links) {
+                // Pretty print the links in the requested format
+                const formattedOutput = {
+                  links: result.links,
+                  timestamp: result.timestamp
+                };
+                console.log(JSON.stringify(formattedOutput, null, 2));
+              } else {
+                console.error(`[CLiTS-DISCOVER-LINKS] Link discovery failed: ${result.error || 'Unknown error'}`);
+                process.exit(1);
+              }
+            } catch (parseError) {
+              console.error('[CLiTS-DISCOVER-LINKS] Failed to parse discovery result:', output);
+              process.exit(1);
+            }
+          } else {
+            console.error('[CLiTS-DISCOVER-LINKS] Link discovery failed:', error);
+            process.exit(1);
+          }
+        });
+      } catch (error) {
+        console.error(`[CLiTS-DISCOVER-LINKS] Discovery failed: ${error instanceof Error ? error.message : String(error)}`);
+        process.exit(1);
+      }
+    });
+
   // Direct Chrome Remote Control command - bypasses Playwright
   program
     .command('chrome-control')
@@ -346,15 +518,14 @@ Examples:
     });
 
   // Add command completion (optional - only if explicitly requested)
-  program.command('completion', 'Generate completion script for your shell.')
-    .action(async () => {
-        console.log('Shell completion is currently disabled to prevent automatic prompts.');
-        console.log('To enable completion, uncomment the tabtab code in src/cli.ts');
-        // await tabtab.install({
-        //     name: 'clits',
-        //     completer: 'clits'
-        // });
-    });
+  // Temporarily disabled to debug option parsing issues
+  // program
+  //   .command('completion')
+  //   .description('Generate completion script for your shell.')
+  //   .action(async () => {
+  //       console.log('Shell completion is currently disabled to prevent automatic prompts.');
+  //       console.log('To enable completion, uncomment the tabtab code in src/cli.ts');
+  //   });
 
   await program.parseAsync();
 }

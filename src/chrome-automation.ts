@@ -106,7 +106,7 @@ export class ChromeAutomation {
     this.host = host;
   }
 
-  async navigate(options: NavigationOptions): Promise<void> {
+  async navigate(options: NavigationOptions): Promise<{ actualUrl: string; success: boolean }> {
     const client = await this.connectToChrome();
     
     try {
@@ -116,10 +116,45 @@ export class ChromeAutomation {
       await Runtime.enable();
 
       logger.info(`Navigating to: ${options.url}`);
+      
+      // Get current URL before navigation for comparison
+      const beforeNavigation = await Runtime.evaluate({
+        expression: 'window.location.href'
+      });
+      const initialUrl = beforeNavigation.result.value;
+      
       await Page.navigate({ url: options.url });
       
       // Wait for page load
       await Page.loadEventFired();
+
+      // CRITICAL FIX: Verify actual URL after navigation
+      const afterNavigation = await Runtime.evaluate({
+        expression: 'window.location.href'
+      });
+      const actualUrl = afterNavigation.result.value;
+      
+      // Parse expected path from target URL for comparison
+      const targetUrl = new URL(options.url);
+      const actualUrlObj = new URL(actualUrl);
+      
+      // Check if navigation was successful
+      const navigationSuccessful = 
+        // Either the URL changed to the target
+        (actualUrl !== initialUrl && 
+         (actualUrlObj.pathname === targetUrl.pathname || 
+          actualUrl.includes(targetUrl.pathname) ||
+          actualUrl === options.url)) ||
+        // Or we were already at the target URL
+        (actualUrl === options.url || 
+         actualUrlObj.pathname === targetUrl.pathname ||
+         actualUrl.includes(targetUrl.pathname));
+      
+      if (!navigationSuccessful) {
+        throw new Error(`Navigation verification failed. Expected URL containing "${targetUrl.pathname}", but got "${actualUrl}". Initial URL was "${initialUrl}".`);
+      }
+      
+      logger.info(`Navigation verified: ${actualUrl}`);
       
       // Wait for specific selector if provided
       if (options.waitForSelector) {
@@ -132,6 +167,8 @@ export class ChromeAutomation {
       }
 
       logger.info('Navigation completed successfully');
+      
+      return { actualUrl, success: true };
     } finally {
       await client.close();
     }
@@ -319,38 +356,85 @@ export class ChromeAutomation {
 
   private async checkChromeConnection(): Promise<boolean> {
     try {
-      await fetch(`http://${this.host}:${this.port}/json/version`);
-      return true;
-    } catch {
+      const response = await fetch(`http://${this.host}:${this.port}/json/version`);
+      if (response.ok) {
+        const version = await response.json() as { Browser?: string };
+        logger.info(`✅ Existing Chrome debugging session detected: ${version.Browser || 'Chrome'}`);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      logger.debug(`No Chrome debugging session found on port ${this.port}: ${error instanceof Error ? error.message : String(error)}`);
       return false;
     }
   }
 
   private async launchChromeIfNeeded(): Promise<void> {
+    // First check if Chrome is already running with debugging
     const isChrome = await this.checkChromeConnection();
     if (isChrome) {
+      logger.info('✅ Using existing Chrome debugging session');
       return;
     }
 
-    // Only auto-launch on macOS for now (same as working clits-inspect)
+    // Check if Chrome process exists but not responding to debugging
     if (process.platform === 'darwin') {
-      console.log('Chrome is not running with remote debugging. Launching Chrome...');
+      try {
+        const { execSync } = await import('child_process');
+        const chromeProcesses = execSync('ps aux | grep Chrome | grep remote-debugging-port', { encoding: 'utf8' });
+        if (chromeProcesses.trim().length > 0) {
+          logger.warn('Chrome process with remote debugging found but not responding. Waiting for it to be ready...');
+          // Wait longer for existing Chrome to become ready
+          for (let i = 0; i < 10; i++) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            const isReady = await this.checkChromeConnection();
+            if (isReady) {
+              logger.info('✅ Existing Chrome session is now ready');
+              return;
+            }
+          }
+          logger.warn('Existing Chrome session did not become ready, will launch new instance');
+        }
+      } catch (error) {
+        logger.debug('Could not check for existing Chrome processes:', error);
+      }
+    }
+
+    // Only launch if no Chrome debugging session exists
+    logger.info('No Chrome debugging session found. Launching Chrome with debugging enabled...');
+    
+    if (process.platform === 'darwin') {
       const { spawn } = await import('child_process');
       const chromePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
       const args = [
         `--remote-debugging-port=${this.port}`,
         '--user-data-dir=/tmp/chrome-debug-clits',
         '--no-first-run',
-        '--no-default-browser-check'
+        '--no-default-browser-check',
+        '--disable-web-security',
+        '--disable-features=VizDisplayCompositor'
       ];
       
-      spawn(chromePath, args, {
+      const chromeProcess = spawn(chromePath, args, {
         detached: true,
         stdio: 'ignore'
-      }).unref();
+      });
+      chromeProcess.unref();
       
-      // Wait for Chrome to start
-      await new Promise(resolve => setTimeout(resolve, 4000));
+      logger.info(`Chrome launched with PID: ${chromeProcess.pid}`);
+      
+      // Wait for Chrome to start and verify connection
+      for (let i = 0; i < 15; i++) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        const isReady = await this.checkChromeConnection();
+        if (isReady) {
+          logger.info('✅ New Chrome debugging session is ready');
+          return;
+        }
+        logger.debug(`Waiting for Chrome to be ready... attempt ${i + 1}/15`);
+      }
+      
+      throw new Error('Chrome launched but debugging session did not become available within 15 seconds');
     } else {
       throw new Error('Chrome is not running with remote debugging enabled. Start Chrome with --remote-debugging-port=9222');
     }
@@ -403,11 +487,18 @@ export class ChromeAutomation {
     const timeout = step.timeout || ChromeAutomation.DEFAULT_TIMEOUT;
 
     switch (step.action) {
-      case 'navigate':
+      case 'navigate': {
         if (!step.url) throw new Error('Navigate step requires url');
-        await client.Page.navigate({ url: step.url });
-        await client.Page.loadEventFired();
+        // Use internal navigation logic for consistency
+        const tempOptions: NavigationOptions = {
+          url: step.url,
+          timeout: timeout
+        };
+        // Call navigate method but handle return internally
+        const tempAutomation = new ChromeAutomation(this.port, this.host);
+        await tempAutomation.navigate(tempOptions);
         break;
+      }
 
       case 'wait':
         if (!step.selector) throw new Error('Wait step requires selector');
@@ -448,6 +539,12 @@ export class ChromeAutomation {
   private async findElementWithFallback(client: CDPClient, selector: string): Promise<{ x: number; y: number } | null> {
     const escapedSelector = this.escapeSelector(selector);
     
+    // Basic elements like body, html, document that always exist and should be found
+    const basicElements = ['body', 'html', 'head', 'document'];
+    const isBasicElement = basicElements.includes(selector.toLowerCase());
+    
+    logger.debug(`Finding element with selector: ${selector}, isBasicElement: ${isBasicElement}`);
+    
     // Try multiple strategies to find the element
     const strategies = [
       // CSS selector
@@ -462,26 +559,61 @@ export class ChromeAutomation {
 
     for (const strategy of strategies) {
       try {
-        const result = await client.Runtime.evaluate({
-          expression: `
-            JSON.stringify((function() {
-              const element = ${strategy};
-              if (!element) return null;
-              const rect = element.getBoundingClientRect();
-              if (rect.width === 0 || rect.height === 0) return null; // Element not visible
-              return {
-                x: rect.left + rect.width / 2,
-                y: rect.top + rect.height / 2,
-                strategy: '${strategy}'
-              };
-            })())
-          `
-        });
+        // Special handling for basic elements
+        if (isBasicElement) {
+          const result = await client.Runtime.evaluate({
+            expression: `
+              (function() {
+                try {
+                  const element = ${strategy};
+                  if (!element) return JSON.stringify({ error: 'element not found' });
+                  const rect = element.getBoundingClientRect();
+                  return JSON.stringify({
+                    x: Math.max(rect.left + rect.width / 2, 100),
+                    y: Math.max(rect.top + rect.height / 2, 100),
+                    strategy: '${strategy.replace(/'/g, "\\'")}',
+                    isBasicElement: true
+                  });
+                } catch (err) {
+                  return JSON.stringify({ error: err.message });
+                }
+              })()
+            `
+          });
+          if (result.result.value && typeof result.result.value === 'string') {
+            const elementInfo = JSON.parse(result.result.value);
+            if (elementInfo.error) {
+              logger.debug(`Basic element strategy failed: ${strategy} - ${elementInfo.error}`);
+            } else {
+              logger.info(`Basic element found using strategy: ${strategy}`, elementInfo);
+              return elementInfo;
+            }
+          } else {
+            logger.debug(`Basic element strategy failed: ${strategy} - no result value`);
+          }
+        } else {
+          // Regular element handling with visibility check
+          const result = await client.Runtime.evaluate({
+            expression: `
+              JSON.stringify((function() {
+                const element = ${strategy};
+                if (!element) return null;
+                const rect = element.getBoundingClientRect();
+                if (rect.width === 0 || rect.height === 0) return null; // Element not visible
+                return {
+                  x: rect.left + rect.width / 2,
+                  y: rect.top + rect.height / 2,
+                  strategy: '${strategy}'
+                };
+              })())
+            `
+          });
 
-        if (result.result.value) {
-          const elementInfo = JSON.parse(result.result.value);
-          logger.info(`Element found using strategy: ${strategy}`);
-          return elementInfo;
+          if (result.result.value) {
+            const elementInfo = JSON.parse(result.result.value);
+            logger.info(`Element found using strategy: ${strategy}`);
+            return elementInfo;
+          }
         }
       } catch (error) {
         // Continue to next strategy

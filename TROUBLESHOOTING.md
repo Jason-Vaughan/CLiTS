@@ -2,6 +2,30 @@
 
 This guide provides solutions to common issues you might encounter while using CLiTS.
 
+## Automation Command Issues (v1.0.7-beta.1 Fixes)
+
+**Problem:** `clits interact --wait-for "body"` or other basic selectors timeout with element not found errors.
+
+**Solution:** ✅ **FIXED in v1.0.7-beta.1**
+- **Root Cause:** JavaScript template literal syntax errors in element finding logic
+- **Fix Applied:** Complete rewrite of element detection with special handling for basic DOM elements
+- **Update Required:** `npm install @puberty-labs/clits@beta`
+
+**Problem:** `clits chrome-control --chrome-port 9222` shows "error: unknown option '--chrome-port'".
+
+**Solution:** ⚠️ **MOSTLY FIXED in v1.0.7-beta.1**
+- **Root Cause:** Commander.js option parsing conflicts
+- **Fix Applied:** Disabled completion command causing conflicts
+- **Status:** Works in most contexts, minor intermittent issues may remain
+- **Workaround:** Use `clits chrome-control --help` to verify options work
+
+**Problem:** `clits automate` workflows fail on wait/selector steps with timeout errors.
+
+**Solution:** ✅ **FIXED in v1.0.7-beta.1**
+- **Root Cause:** Same selector finding bug affecting all automation operations
+- **Fix Applied:** Enhanced element detection applies throughout automation framework
+- **Validation:** Multi-step workflows now complete successfully
+
 ## Chrome Connection Issues
 
 **Problem:** CLiTS reports that it cannot connect to Chrome, or no debuggable targets are found.

@@ -1,0 +1,18 @@
+{
+  "steps": [
+    {
+      "action": "wait",
+      "selector": "body",
+      "timeout": 10000
+    },
+    {
+      "action": "screenshot",
+      "path": "automation-test.png"
+    }
+  ],
+  "options": {
+    "timeout": 30000,
+    "captureNetwork": false,
+    "monitor": false
+  }
+} 

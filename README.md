@@ -165,6 +165,60 @@ Navigate to URLs and wait for elements.
 clits navigate --url "http://localhost:5173/displays" --wait-for ".displays-manager" --screenshot "navigation.png"
 ```
 
+### `clits discover-links`
+**NEW in v1.0.7** - Discover all navigation links on the current page for dynamic automation.
+
+**Options:**
+- `--chrome-host <host>`: Chrome DevTools host (default: `localhost`)
+- `--chrome-port <port>`: Chrome DevTools port (default: `9222`)
+- `--verbose`: Enable verbose output
+
+**Output Format:**
+```json
+{
+  "links": [
+    {"text": "Dashboard", "url": "/dashboard", "selector": "a[href='/dashboard']"},
+    {"text": "Display Manager", "url": "/displays-manager", "selector": "a[href='/displays-manager']"},
+    {"text": "Tasks", "url": "/tasks", "selector": "a[href='/tasks']"}
+  ],
+  "timestamp": "2025-06-08T05:52:00.000Z"
+}
+```
+
+**Example:**
+```sh
+clits discover-links --chrome-port 9222
+```
+
+### Enhanced `clits navigate` - Dynamic Navigation
+**NEW in v1.0.7** - Navigate using discovered links instead of hard-coded URLs.
+
+**Navigation Methods:**
+- `--url <url>`: Navigate to specific URL (traditional method)
+- `--link-text <text>`: Navigate by finding link with matching text (fuzzy matching)
+- `--url-contains <pattern>`: Navigate by finding link with URL containing pattern
+
+**Dynamic Navigation Examples:**
+```sh
+# Navigate by link text (case-insensitive, fuzzy matching)
+clits navigate --link-text "Display Manager" --chrome-port 9222
+clits navigate --link-text "task" --chrome-port 9222  # Matches "Tasks"
+clits navigate --link-text "DASH" --chrome-port 9222  # Matches "Dashboard"
+
+# Navigate by URL pattern (substring matching)
+clits navigate --url-contains "display" --chrome-port 9222  # Matches /displays-manager
+clits navigate --url-contains "admin" --chrome-port 9222    # Matches /admin
+
+# Combine with existing options
+clits navigate --link-text "Settings" --wait-for ".settings-panel" --screenshot "settings.png"
+```
+
+**Automation Benefits:**
+- ✅ **Self-healing scripts** - No more broken automation when routes change
+- ✅ **Fuzzy matching** - "task" finds "Tasks", "display" finds "Display Manager"
+- ✅ **Error suggestions** - Shows available links when text not found
+- ✅ **CissorCLITS ready** - Perfect for dynamic test generation
+
 ### `clits interact`
 Interact with page elements.
 
@@ -188,14 +242,17 @@ CLITS now supports multiple selector strategies with automatic fallback:
 
 **Examples:**
 ```sh
-# Basic interaction with timeout
-clits interact --click "[data-testid='edit-btn']" --wait-for ".edit-dialog" --timeout 15000
+# Basic interaction with improved timeout (now defaults to 30s)
+clits interact --click "[data-testid='edit-btn']" --wait-for ".edit-dialog" --chrome-port 9222
+
+# Wait for basic DOM elements (now works reliably)
+clits interact --wait-for "body" --screenshot "page-loaded.png" --chrome-port 9222
 
 # Text-based selector (finds button containing "Edit")
 clits interact --click "Edit" --wait-for ".modal-dialog" --timeout 10000
 
 # Complex selector with network capture
-clits interact --toggle "input[data-field='active']" --capture-network --screenshot "toggle.png"
+clits interact --toggle "input[data-field='active']" --capture-network --screenshot "toggle.png" --chrome-port 9222
 ```
 
 ### `clits automate`
@@ -213,6 +270,7 @@ Run automation scripts from JSON files.
 {
   "steps": [
     {"action": "navigate", "url": "http://localhost:5173/displays"},
+    {"action": "wait", "selector": "body", "timeout": 5000},
     {"action": "wait", "selector": ".displays-manager", "timeout": 10000},
     {"action": "click", "selector": ".edit-button"},
     {"action": "toggle", "selector": ".toggle-switch[data-field='active']"},
@@ -228,7 +286,11 @@ Run automation scripts from JSON files.
 
 **Example:**
 ```sh
-clits automate --script automation.json --monitor --save-results results.json
+# Basic automation with improved selector reliability
+clits automate --script automation.json --chrome-port 9222 --monitor --save-results results.json
+
+# Quick automation validation
+clits automate --script test-workflow.json --chrome-port 9222
 ```
 
 ### `clits-inspect`
@@ -324,6 +386,15 @@ clits-inspect --auto --json --action logs --duration 30
 
 # 6. Smart Target Selection (prioritize localhost)
 clits-inspect --auto --json --action logs --target-priority localhost
+
+# 7. NEW: Discover Navigation Links (v1.0.7)
+clits-inspect --auto --json --action discover-links
+
+# 8. NEW: Navigate by Link Text (v1.0.7)
+clits-inspect --auto --json --action navigate-by-text --link-text "Dashboard"
+
+# 9. NEW: Navigate by URL Pattern (v1.0.7)
+clits-inspect --auto --json --action navigate-by-url --url-contains "display"
 ```
 
 #### **AI Command Options**
@@ -332,7 +403,7 @@ clits-inspect --auto --json --action logs --target-priority localhost
 |--------|--------|-------------|
 | `--auto` | - | **Required for AI**: Zero human interaction |
 | `--json` | - | **Required for AI**: Structured JSON output |
-| `--action` | `logs\|navigate\|click` | Action to perform |
+| `--action` | `logs\|navigate\|click\|discover-links\|navigate-by-text\|navigate-by-url` | Action to perform |
 | `--url` | URL string | Navigate to specific URL automatically |
 | `--selector` | CSS selector or URL | Element to click (for click action) |
 | `--duration` | seconds (default: 15) | Log collection duration |

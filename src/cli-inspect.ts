@@ -19,8 +19,10 @@ program
   .option('--auto', 'Run in fully automated mode (no prompts)')
   .option('--json', 'Output structured JSON for AI consumption')
   .option('--verbose', 'Enable verbose logging for debugging automation workflows')
-  .option('--action <action>', 'Specific action: logs|navigate|click', 'logs')
+  .option('--action <action>', 'Specific action: logs|navigate|click|discover-links|navigate-by-text|navigate-by-url', 'logs')
   .option('--selector <selector>', 'CSS selector to click (for click action)')
+  .option('--link-text <text>', 'Link text to search for (for navigate-by-text action)')
+  .option('--url-contains <pattern>', 'URL pattern to match (for navigate-by-url action)')
   .option('--duration <seconds>', 'Log collection duration in seconds', '15')
   .option('--port <port>', 'Chrome debugging port', '9222')
   .option('--host <host>', 'Chrome debugging host', 'localhost')
@@ -269,6 +271,43 @@ async function aiAutomationMode() {
         if (options.verbose) console.log(chalk.blue('🗺️  Building element hierarchy...'));
         result.elements = await buildElementHierarchyDirect(target.id, parseInt(options.port), options.host);
         if (options.verbose) console.log(chalk.green(`✅ Found ${result.elements.length} interactive elements`));
+        break;
+      case 'discover-links':
+        if (options.verbose) console.log(chalk.blue('🔗 Discovering navigation links...'));
+        result.links = await discoverNavigationLinks(target.id, parseInt(options.port), options.host);
+        if (options.verbose) console.log(chalk.green(`✅ Found ${result.links.length} navigation links`));
+        break;
+      case 'navigate-by-text':
+        if (options.linkText) {
+          if (options.verbose) console.log(chalk.blue(`🎯 Finding link with text: ${options.linkText}`));
+          const matchedLink = await findLinkByText(target.id, options.linkText, parseInt(options.port), options.host);
+          if (matchedLink) {
+            if (options.verbose) console.log(chalk.blue(`🧭 Navigating via link: ${matchedLink.text} -> ${matchedLink.url}`));
+            await clickElementDirect(target.id, matchedLink.url, parseInt(options.port), options.host);
+            result.navigated = { text: matchedLink.text, url: matchedLink.url, method: 'link-text' };
+            if (options.verbose) console.log(chalk.green('✅ Navigation successful'));
+          } else {
+            throw new Error(`No link found matching text: "${options.linkText}"`);
+          }
+        } else {
+          throw new Error('--link-text required for navigate-by-text action');
+        }
+        break;
+      case 'navigate-by-url':
+        if (options.urlContains) {
+          if (options.verbose) console.log(chalk.blue(`🎯 Finding link with URL containing: ${options.urlContains}`));
+          const matchedLink = await findLinkByUrlPattern(target.id, options.urlContains, parseInt(options.port), options.host);
+          if (matchedLink) {
+            if (options.verbose) console.log(chalk.blue(`🧭 Navigating via URL pattern: ${matchedLink.text} -> ${matchedLink.url}`));
+            await clickElementDirect(target.id, matchedLink.url, parseInt(options.port), options.host);
+            result.navigated = { text: matchedLink.text, url: matchedLink.url, method: 'url-pattern' };
+            if (options.verbose) console.log(chalk.green('✅ Navigation successful'));
+          } else {
+            throw new Error(`No link found with URL containing: "${options.urlContains}"`);
+          }
+        } else {
+          throw new Error('--url-contains required for navigate-by-url action');
+        }
         break;
       case 'click':
         if (options.selector) {
@@ -829,6 +868,56 @@ async function clickElementDirect(targetId: string, selector: string, port: numb
   } finally {
     await client.close();
   }
+}
+
+// New function to discover navigation links specifically
+async function discoverNavigationLinks(targetId: string, port: number, host: string): Promise<Array<{ text: string; url: string; selector: string }>> {
+  const allElements = await buildElementHierarchyDirect(targetId, port, host);
+  
+  // Filter to only navigation links (elements that have URLs starting with http)
+  const navigationLinks = allElements
+    .filter(element => element.url.startsWith('http'))
+    .map(element => ({
+      text: element.name.replace(/^🔗\s*/, ''), // Remove link emoji prefix if present
+      url: element.url,
+      selector: `a[href="${element.url}"]`
+    }));
+  
+  return navigationLinks;
+}
+
+// New function to find a link by text with fuzzy matching
+async function findLinkByText(targetId: string, searchText: string, port: number, host: string): Promise<{ text: string; url: string } | null> {
+  const links = await discoverNavigationLinks(targetId, port, host);
+  
+  // Case-insensitive substring matching
+  const searchLower = searchText.toLowerCase();
+  const matchedLink = links.find(link => 
+    link.text.toLowerCase().includes(searchLower)
+  );
+  
+  if (matchedLink) {
+    return { text: matchedLink.text, url: matchedLink.url };
+  }
+  
+  return null;
+}
+
+// New function to find a link by URL pattern
+async function findLinkByUrlPattern(targetId: string, urlPattern: string, port: number, host: string): Promise<{ text: string; url: string } | null> {
+  const links = await discoverNavigationLinks(targetId, port, host);
+  
+  // Case-insensitive substring matching on URL
+  const patternLower = urlPattern.toLowerCase();
+  const matchedLink = links.find(link => 
+    link.url.toLowerCase().includes(patternLower)
+  );
+  
+  if (matchedLink) {
+    return { text: matchedLink.text, url: matchedLink.url };
+  }
+  
+  return null;
 }
 
 // Entry point: Only run main if this file is executed directly
