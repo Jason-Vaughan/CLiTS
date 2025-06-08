@@ -348,13 +348,45 @@ export class ChromeExtractor {
     // Otherwise apply standard filters
     // Check log level
     if (log.type === 'console' || log.type === 'log') {
-      const details = log.details as ConsoleMessage | DevToolsLogEntry;
-      if (!details || typeof details.level !== 'string') {
-        logger.warn('Invalid log entry: missing or invalid level property', { log });
-        return false;
+      const details = log.details as ConsoleMessage | DevToolsLogEntry | any;
+      
+      // Handle nested message structure for console logs
+      let level: string;
+      if (details?.message && typeof details.message.level === 'string') {
+        // Console logs have nested message structure
+        level = details.message.level.toLowerCase();
+      } else if (details && typeof details.level === 'string') {
+        // DevTools logs have level directly on details
+        level = details.level.toLowerCase();
+      } else {
+        logger.debug('Log entry missing level property, defaulting to "log"', { logType: log.type, details });
+        level = 'log'; // Default to 'log' level instead of rejecting
       }
-      const level = details.level.toLowerCase();
-      const logLevel = level as 'error' | 'warning' | 'info' | 'debug' | 'log';
+      
+      // Map log levels to standardized values
+      let logLevel: 'error' | 'warning' | 'info' | 'debug' | 'log';
+      switch (level) {
+        case 'log':
+        case 'info':
+          logLevel = 'log'; // Map both 'log' and 'info' to 'log' for consistency
+          break;
+        case 'warn':
+        case 'warning':
+          logLevel = 'warning';
+          break;
+        case 'error':
+          logLevel = 'error';
+          break;
+        case 'debug':
+          logLevel = 'debug';
+          break;
+        default:
+          // For unknown levels, default to 'log' to avoid filtering out valid entries
+          logger.debug('Unknown log level, defaulting to "log"', { level, log });
+          logLevel = 'log';
+          break;
+      }
+      
       if (!filters.logLevels?.includes(logLevel)) {
         return false;
       }
@@ -844,9 +876,20 @@ export class ChromeExtractor {
       const toISOString = (timestamp: number) => {
         try {
           // Handle null, undefined, or invalid timestamp values
-          if (!timestamp) {
-            logger.warn('Missing timestamp value', { timestamp });
-            return new Date().toISOString(); // Use current time as fallback
+          if (timestamp === null || timestamp === undefined || timestamp === 0) {
+            // Use current time as fallback without warning for expected cases
+            return new Date().toISOString();
+          }
+          
+          // Handle string timestamps that might come from some Chrome events
+          if (typeof timestamp === 'string') {
+            const parsed = parseFloat(timestamp);
+            if (!isNaN(parsed)) {
+              timestamp = parsed;
+            } else {
+              logger.debug('Invalid string timestamp, using current time', { timestamp });
+              return new Date().toISOString();
+            }
           }
           
           // If timestamp is in seconds (less than year 2100), convert to milliseconds
@@ -854,13 +897,13 @@ export class ChromeExtractor {
           
           // Validate timestamp is within reasonable range
           if (isNaN(ms) || ms < 0 || ms > 9999999999999) {
-            logger.warn('Invalid timestamp value out of range', { timestamp, ms });
+            logger.debug('Invalid timestamp value out of range, using current time', { timestamp, ms });
             return new Date().toISOString(); // Use current time as fallback
           }
           
           return new Date(ms).toISOString();
         } catch (error) {
-          logger.warn('Invalid timestamp encountered', { timestamp, error });
+          logger.debug('Invalid timestamp encountered, using current time', { timestamp, error });
           return new Date().toISOString(); // Use current time as fallback
         }
       };
@@ -1256,6 +1299,17 @@ export class ChromeExtractor {
 
       if (this.options.includeConsole) {
         Console.messageAdded((params: ConsoleMessage) => {
+          // Ensure required properties are present
+          if (!params || typeof params.text !== 'string') {
+            logger.debug('Skipping invalid console message: missing text', { params });
+            return;
+          }
+
+          // Ensure level is a string, default to 'log' if missing
+          if (!params.level || typeof params.level !== 'string') {
+            params.level = 'log';
+          }
+
           // Check if this is a platform-specific error that should be suppressed
           if (PlatformErrorHandler.isPlatformError(params.text)) {
             const platformError = PlatformErrorHandler.handleError(params.text);
@@ -1277,12 +1331,26 @@ export class ChromeExtractor {
           logger.debug('Console message detected', { level: params.level, text: params.text, details: params });
           this.collectedLogs.push({
             type: 'console',
-            timestamp: toISOString(params.timestamp),
-            details: params
+            timestamp: toISOString(params.timestamp || Date.now() / 1000),
+            details: {
+              ...params,
+              timestamp: params.timestamp || Date.now() / 1000 // Ensure timestamp is present
+            }
           });
         });
 
         Log.entryAdded((params: DevToolsLogEntry) => {
+          // Ensure required properties are present
+          if (!params || typeof params.text !== 'string') {
+            logger.debug('Skipping invalid log entry: missing text', { params });
+            return;
+          }
+
+          // Ensure level is a string, default to 'log' if missing
+          if (!params.level || typeof params.level !== 'string') {
+            params.level = 'log';
+          }
+
           // Check if this is a platform-specific error that should be suppressed
           if (PlatformErrorHandler.isPlatformError(params.text)) {
             const platformError = PlatformErrorHandler.handleError(params.text);
@@ -1304,8 +1372,11 @@ export class ChromeExtractor {
           logger.debug('Log entry detected', { level: params.level, text: params.text, details: params });
           this.collectedLogs.push({
             type: 'log',
-            timestamp: toISOString(params.timestamp),
-            details: params
+            timestamp: toISOString(params.timestamp || Date.now() / 1000),
+            details: {
+              ...params,
+              timestamp: params.timestamp || Date.now() / 1000 // Ensure timestamp is present
+            }
           });
         });
       }
