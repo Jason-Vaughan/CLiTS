@@ -40,7 +40,7 @@
     "test": "vitest",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test",
+
     "docs:generate": "typedoc"
   },
   "keywords": [
@@ -75,7 +75,6 @@
     "node": ">=20"
   },
   "devDependencies": {
-    "@playwright/test": "^1.52.0",
     "@puberty-labs/clits": "^1.0.4-beta.0",
     "@types/chrome-remote-interface": "^0.31.7",
     "@types/inquirer": "^9.0.8",

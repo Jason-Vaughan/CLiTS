@@ -30,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Navigation UI**: Increased page size to show more elements (20 vs 15) with clear level indicators
 - **Error Handling**: Improved error context and recovery throughout the application
 - **Connection Stability**: Enhanced reconnection logic for Chrome browser refreshes and tab changes
+- **Dependencies**: Removed Playwright dependency - now uses direct Chrome DevTools Protocol for all browser automation
+
+### Removed
+- **Playwright Dependency**: All browser automation now uses direct Chrome Remote Interface, eliminating the need for Playwright
 
 ## [1.0.0] - 2024-06-05
 

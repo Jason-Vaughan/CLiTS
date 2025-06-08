@@ -71,10 +71,9 @@
 
 ## Prerequisites
 
-- **Node.js** >= 16
+- **Node.js** >= 20
 - **Google Chrome** (latest recommended)
 - **inquirer** (for interactive prompts)
-- (Optional) [Playwright](https://playwright.dev/) for advanced automation
 
 ---
 
