@@ -44,6 +44,11 @@ export interface InteractionOptions {
   screenshotPath?: string;
   chromePort?: number;
   chromeHost?: string;
+  // New tab discovery features
+  discoverTabs?: boolean;
+  findSaveButton?: boolean;
+  customSavePatterns?: string[];
+  tabLabelPattern?: string;
 }
 
 export interface AutomationStep {
@@ -232,6 +237,46 @@ export class ChromeAutomation {
       // Take screenshot if requested
       if (options.screenshotPath) {
         await this.takeScreenshot(client, options.screenshotPath);
+      }
+
+      // Handle tab discovery
+      if (options.discoverTabs) {
+        const tabs = await this.discoverTabLabels(client);
+        
+        // If a specific tab label or pattern is specified, click it
+        if (options.clickSelector && tabs.length > 0) {
+          let targetTab = null;
+          
+          if (options.tabLabelPattern) {
+            const regex = new RegExp(options.tabLabelPattern, 'i');
+            targetTab = tabs.find(tab => regex.test(tab.label));
+          } else if (options.clickSelector) {
+            targetTab = tabs.find(tab => 
+              tab.label.toLowerCase().includes(options.clickSelector!.toLowerCase())
+            );
+          }
+          
+          if (targetTab) {
+            await this.clickElement(client, targetTab.selector);
+            logger.info(`Clicked tab: ${targetTab.label}`);
+          }
+        }
+        
+        // Output discovered tabs
+        console.log(JSON.stringify({
+          success: true,
+          tabCount: tabs.length,
+          tabs: tabs
+        }, null, 2));
+      }
+
+      // Handle save button discovery
+      if (options.findSaveButton) {
+        const saveButton = await this.findSaveButton(client, options.customSavePatterns);
+        console.log(JSON.stringify({
+          success: true,
+          saveButton: saveButton
+        }, null, 2));
       }
 
       // Log network activity if captured
@@ -557,19 +602,58 @@ export class ChromeAutomation {
     const strategies = [
       // Direct CSS selector
       `document.querySelector('${escapedSelector}')`,
-      // React/Material-UI button patterns
-      `document.querySelector('button${escapedSelector.startsWith('.') ? escapedSelector : '[class*="' + escapedSelector.replace(/['"]/g, '') + '"]'}')`,
+      
+      // Material-UI Button Components
       `document.querySelector('.MuiButton-root${escapedSelector.startsWith('.') ? escapedSelector : '[class*="' + escapedSelector.replace(/['"]/g, '') + '"]'}')`,
-      // Input patterns including checkboxes
+      `document.querySelector('.MuiIconButton-root${escapedSelector.startsWith('.') ? escapedSelector : '[class*="' + escapedSelector.replace(/['"]/g, '') + '"]'}')`,
+      `document.querySelector('.MuiFab-root${escapedSelector.startsWith('.') ? escapedSelector : '[class*="' + escapedSelector.replace(/['"]/g, '') + '"]'}')`,
+      `document.querySelector('.MuiToggleButton-root${escapedSelector.startsWith('.') ? escapedSelector : '[class*="' + escapedSelector.replace(/['"]/g, '') + '"]'}')`,
+      
+      // Material-UI Dialog/Modal Components
+      `document.querySelector('.MuiDialog-root${escapedSelector.startsWith('.') ? escapedSelector : '[class*="' + escapedSelector.replace(/['"]/g, '') + '"]'}')`,
+      `document.querySelector('.MuiModal-root${escapedSelector.startsWith('.') ? escapedSelector : '[class*="' + escapedSelector.replace(/['"]/g, '') + '"]'}')`,
+      `document.querySelector('[role="dialog"]${escapedSelector.startsWith('[') ? escapedSelector : '[class*="' + escapedSelector.replace(/['"]/g, '') + '"]'}')`,
+      
+      // Material-UI Tab Components
+      `document.querySelector('.MuiTab-root${escapedSelector.startsWith('.') ? escapedSelector : '[class*="' + escapedSelector.replace(/['"]/g, '') + '"]'}')`,
+      `document.querySelector('.MuiTabs-root${escapedSelector.startsWith('.') ? escapedSelector : '[class*="' + escapedSelector.replace(/['"]/g, '') + '"]'}')`,
+      `document.querySelector('[role="tab"]${escapedSelector.startsWith('[') ? escapedSelector : '[class*="' + escapedSelector.replace(/['"]/g, '') + '"]'}')`,
+      
+      // Material-UI Switch/Toggle Components
+      `document.querySelector('.MuiSwitch-root${escapedSelector.startsWith('.') ? escapedSelector : '[class*="' + escapedSelector.replace(/['"]/g, '') + '"]'}')`,
+      `document.querySelector('.MuiCheckbox-root${escapedSelector.startsWith('.') ? escapedSelector : '[class*="' + escapedSelector.replace(/['"]/g, '') + '"]'}')`,
+      `document.querySelector('.MuiRadio-root${escapedSelector.startsWith('.') ? escapedSelector : '[class*="' + escapedSelector.replace(/['"]/g, '') + '"]'}')`,
+      
+      // Material-UI Action Areas
+      `document.querySelector('.MuiDialogActions-root${escapedSelector.startsWith('.') ? escapedSelector : '[class*="' + escapedSelector.replace(/['"]/g, '') + '"]'}')`,
+      `document.querySelector('.MuiCardActions-root${escapedSelector.startsWith('.') ? escapedSelector : '[class*="' + escapedSelector.replace(/['"]/g, '') + '"]'}')`,
+      `document.querySelector('.MuiButtonGroup-root${escapedSelector.startsWith('.') ? escapedSelector : '[class*="' + escapedSelector.replace(/['"]/g, '') + '"]'}')`,
+      
+      // Enhanced save button detection in dialogs by text
+      `Array.from(document.querySelectorAll('.MuiDialog-root button, .MuiModal-root button, [role="dialog"] button')).find(btn => /save|update|apply|ok|done|submit|confirm/i.test(btn.textContent?.trim() || ''))`,
+      
+      // Enhanced save button detection by attributes
+      `document.querySelector('.MuiDialog-root button[type="submit"], .MuiDialog-root button[aria-label*="save"], .MuiDialog-root button[title*="save"]')`,
+      `document.querySelector('.MuiDialogActions-root button[type="submit"], .modal-footer button[type="submit"]')`,
+      
+      // Icon-based save button detection
+      `Array.from(document.querySelectorAll('.MuiDialog-root .MuiIconButton-root, .MuiDialog-root button')).find(btn => btn.querySelector('.MuiSvgIcon-root') && /save|check|done|apply/i.test(btn.getAttribute('aria-label') || ''))`,
+      
+      // Input patterns including checkboxes and radio buttons
       `document.querySelector('input[type="checkbox"]${escapedSelector.includes('checkbox') ? '' : '[class*="' + escapedSelector.replace(/['"]/g, '') + '"]'}')`,
+      `document.querySelector('input[type="radio"]${escapedSelector.includes('radio') ? '' : '[class*="' + escapedSelector.replace(/['"]/g, '') + '"]'}')`,
       `document.querySelector('input${escapedSelector.startsWith('[') ? escapedSelector : '[class*="' + escapedSelector.replace(/['"]/g, '') + '"]'}')`,
+      
       // Text content search for buttons and links
       `Array.from(document.querySelectorAll('button, a, [role="button"]')).find(el => el.textContent && el.textContent.trim().includes('${escapedSelector.replace(/['"]/g, '')}'))`,
+      
       // Data attribute search
       `document.querySelector('[data-testid="${escapedSelector.replace(/['"]/g, '')}"]')`,
       `document.querySelector('[data-testid*="${escapedSelector.replace(/['"]/g, '')}"]')`,
+      
       // Aria label search
       `document.querySelector('[aria-label*="${escapedSelector.replace(/['"]/g, '')}"]')`,
+      
       // Class-based search
       `document.querySelector('[class*="${escapedSelector.replace(/['"]/g, '')}"]')`
     ];
@@ -765,5 +849,151 @@ export class ChromeAutomation {
     
     writeFileSync(path, screenshot.data, 'base64');
     logger.info(`Screenshot saved: ${path}`);
+  }
+
+  /**
+   * Discovers all tab labels in a dialog or tabbed interface
+   * @param client CDP client instance
+   * @returns Array of tab labels with their selectors
+   */
+  async discoverTabLabels(client: CDPClient): Promise<Array<{ label: string; selector: string; index: number }>> {
+    const result = await client.Runtime.evaluate({
+      expression: `
+        JSON.stringify((function() {
+          const tabs = Array.from(document.querySelectorAll('.MuiTab-root, [role="tab"], .MuiTabs-root .MuiTab-root'));
+          return tabs.map((tab, index) => ({
+            label: tab.textContent?.trim() || tab.getAttribute('aria-label') || tab.getAttribute('title') || '',
+            selector: tab.getAttribute('data-testid') || 
+                     (tab.getAttribute('aria-label') ? '[aria-label="' + tab.getAttribute('aria-label') + '"]' : '') ||
+                     (tab.textContent?.trim() ? ':contains("' + tab.textContent.trim() + '")' : '') ||
+                     '.MuiTab-root:nth-child(' + (index + 1) + ')',
+            index: index,
+            isActive: tab.getAttribute('aria-selected') === 'true' || tab.classList.contains('Mui-selected'),
+            isDisabled: tab.getAttribute('aria-disabled') === 'true' || tab.classList.contains('Mui-disabled')
+          })).filter(tab => tab.label);
+        })())
+      `
+    });
+
+    if (result.result.value) {
+      return JSON.parse(result.result.value);
+    }
+    return [];
+  }
+
+  /**
+   * Finds the best save button in a dialog using multiple strategies
+   * @param client CDP client instance
+   * @param customText Optional custom text patterns for save buttons
+   * @returns Save button element info or null
+   */
+  async findSaveButton(client: CDPClient, customText?: string[]): Promise<{ x: number; y: number; strategy: string } | null> {
+    const savePatterns = customText || ['save', 'update', 'apply', 'ok', 'done', 'submit', 'confirm'];
+
+    const result = await client.Runtime.evaluate({
+      expression: `
+        JSON.stringify((function() {
+          const savePatterns = ${JSON.stringify(savePatterns)};
+          const patternRegex = /${savePatterns.join('|')}/i;
+          
+          // Strategy 1: Find by text content
+          const buttonsByText = Array.from(document.querySelectorAll('.MuiDialog-root button, .MuiModal-root button, [role="dialog"] button'))
+            .filter(btn => patternRegex.test(btn.textContent?.trim() || ''));
+          if (buttonsByText.length > 0) {
+            const rect = buttonsByText[0].getBoundingClientRect();
+            return {
+              x: rect.left + rect.width / 2,
+              y: rect.top + rect.height / 2,
+              strategy: 'text-content',
+              text: buttonsByText[0].textContent?.trim()
+            };
+          }
+
+          // Strategy 2: Find by type="submit"
+          const submitButtons = Array.from(document.querySelectorAll('.MuiDialog-root button[type="submit"], .MuiModal-root button[type="submit"], .MuiDialogActions-root button[type="submit"]'));
+          if (submitButtons.length > 0) {
+            const rect = submitButtons[0].getBoundingClientRect();
+            return {
+              x: rect.left + rect.width / 2,
+              y: rect.top + rect.height / 2,
+              strategy: 'submit-type',
+              text: submitButtons[0].textContent?.trim()
+            };
+          }
+
+          // Strategy 3: Find by aria-label or title
+          const ariaButtons = Array.from(document.querySelectorAll('.MuiDialog-root button, .MuiModal-root button'))
+            .filter(btn => patternRegex.test(btn.getAttribute('aria-label') || '') || patternRegex.test(btn.getAttribute('title') || ''));
+          if (ariaButtons.length > 0) {
+            const rect = ariaButtons[0].getBoundingClientRect();
+            return {
+              x: rect.left + rect.width / 2,
+              y: rect.top + rect.height / 2,
+              strategy: 'aria-label',
+              ariaLabel: ariaButtons[0].getAttribute('aria-label'),
+              title: ariaButtons[0].getAttribute('title')
+            };
+          }
+
+          // Strategy 4: Find icon buttons with save-like icons
+          const iconButtons = Array.from(document.querySelectorAll('.MuiDialog-root .MuiIconButton-root, .MuiDialog-root button'))
+            .filter(btn => {
+              const svg = btn.querySelector('.MuiSvgIcon-root, svg');
+              if (!svg) return false;
+              const ariaLabel = btn.getAttribute('aria-label') || '';
+              const title = btn.getAttribute('title') || '';
+              return patternRegex.test(ariaLabel) || patternRegex.test(title);
+            });
+          if (iconButtons.length > 0) {
+            const rect = iconButtons[0].getBoundingClientRect();
+            return {
+              x: rect.left + rect.width / 2,
+              y: rect.top + rect.height / 2,
+              strategy: 'icon-button',
+              ariaLabel: iconButtons[0].getAttribute('aria-label')
+            };
+          }
+
+          // Strategy 5: Find in action areas (last resort)
+          const actionButtons = Array.from(document.querySelectorAll('.MuiDialogActions-root button:not([disabled]), .modal-footer button:not([disabled])'));
+          if (actionButtons.length === 1) {
+            const rect = actionButtons[0].getBoundingClientRect();
+            return {
+              x: rect.left + rect.width / 2,
+              y: rect.top + rect.height / 2,
+              strategy: 'single-action-button',
+              text: actionButtons[0].textContent?.trim(),
+              warning: 'Only one enabled button found in action area - assuming it is the save button'
+            };
+          }
+
+          // Strategy 6: Primary button in action area
+          const primaryButtons = Array.from(document.querySelectorAll('.MuiDialogActions-root .MuiButton-containedPrimary, .MuiDialogActions-root .MuiButton-root[color="primary"]'));
+          if (primaryButtons.length > 0) {
+            const rect = primaryButtons[0].getBoundingClientRect();
+            return {
+              x: rect.left + rect.width / 2,
+              y: rect.top + rect.height / 2,
+              strategy: 'primary-button',
+              text: primaryButtons[0].textContent?.trim()
+            };
+          }
+
+          return { error: 'No save button found with any strategy' };
+        })())
+      `
+    });
+
+    if (result.result.value) {
+      const buttonInfo = JSON.parse(result.result.value);
+      if (buttonInfo.error) {
+        logger.warn(`Save button detection failed: ${buttonInfo.error}`);
+        return null;
+      }
+      logger.info(`Save button found using strategy: ${buttonInfo.strategy}`, buttonInfo);
+      return buttonInfo;
+    }
+
+    return null;
   }
 } 

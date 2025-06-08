@@ -87,7 +87,7 @@ npm install -g clits
 
 ## Quick Start
 
-### 🎉 OnDeck Integration Ready (v1.0.7-beta.2)
+### 🎉 OnDeck Integration Ready (v1.0.7-beta.3)
 
 **Production Status**: ✅ **ALL AUTOMATION BLOCKERS RESOLVED** - Ready for immediate OnDeck integration
 
@@ -97,9 +97,17 @@ npm install -g clits
 ✅ clits interact --chrome-port 9222 --wait-for "body"          # React selectors working
 ✅ clits automate --script workflow.json --chrome-port 9222     # Multi-step workflows
 ✅ clits chrome-control --chrome-port 9222                      # Parameter parsing fixed
+✅ clits discover-tabs --chrome-port 9222                       # Tab discovery working
+✅ clits interact --chrome-port 9222 --wait-for ".MuiButton-root"  # Material-UI detection
 ```
 
-**Latest Fixes (v1.0.7-beta.2):**
+**Latest Enhancements (v1.0.7-beta.3):**
+- ✅ **Material-UI Support**: Comprehensive selector patterns for Material-UI components
+- ✅ **Save Button Detection**: Intelligent strategies for reliable save button identification
+- ✅ **Tab Discovery**: New command for discovering and interacting with tabs
+- ✅ **Documentation**: Mandatory updates for all NPM releases (including beta versions)
+
+**Previous Fixes (v1.0.7-beta.2):**
 - ✅ **Log Collection**: Eliminated all "Invalid log entry" validation warnings
 - ✅ **React Selectors**: Fixed timeout issues with `body`, `html`, and basic DOM elements
 - ✅ **Command Parsing**: Resolved chrome-control parameter parsing conflicts
@@ -216,34 +224,78 @@ clits navigate --url "http://localhost:5173/displays" --wait-for ".displays-mana
 clits discover-links --chrome-port 9222
 ```
 
-### Enhanced `clits navigate` - Dynamic Navigation
-**NEW in v1.0.7** - Navigate using discovered links instead of hard-coded URLs.
+### `clits discover-tabs`
+**NEW in v1.0.7-beta.3** - Advanced tab discovery and interaction for Material-UI dialogs and tabbed interfaces.
 
-**Navigation Methods:**
-- `--url <url>`: Navigate to specific URL (traditional method)
-- `--link-text <text>`: Navigate by finding link with matching text (fuzzy matching)
-- `--url-contains <pattern>`: Navigate by finding link with URL containing pattern
+**Options:**
+- `--chrome-host <host>`: Chrome DevTools host (default: `localhost`)
+- `--chrome-port <port>`: Chrome DevTools port (default: `9222`)
+- `--tab-label <label>`: Select tab by label after discovery
+- `--tab-label-regex <pattern>`: Select tab by regex pattern  
+- `--custom-save-patterns <patterns>`: Custom save button text patterns (comma-separated)
+- `--find-save-button`: Also discover the best save button in the current dialog
+- `--verbose`: Enable verbose output
 
-**Dynamic Navigation Examples:**
-```sh
-# Navigate by link text (case-insensitive, fuzzy matching)
-clits navigate --link-text "Display Manager" --chrome-port 9222
-clits navigate --link-text "task" --chrome-port 9222  # Matches "Tasks"
-clits navigate --link-text "DASH" --chrome-port 9222  # Matches "Dashboard"
+**Material-UI Integration:**
+- **Comprehensive Component Support**: `.MuiButton-root`, `.MuiIconButton-root`, `.MuiFab-root`, `.MuiToggleButton-root`, `.MuiDialog-root`, `.MuiModal-root`, `.MuiTab-root`, `.MuiTabs-root`, `.MuiSwitch-root`, `.MuiCheckbox-root`, `.MuiRadio-root`, `.MuiDialogActions-root`, `.MuiCardActions-root`, `.MuiButtonGroup-root`
+- **Intelligent Save Button Detection**: By text ("Save", "Update", "Apply", "OK", "Done", "Submit", "Confirm"), by attributes (`type="submit"`, `aria-label`, `title`), by icons (save icons in `.MuiSvgIcon-root`), in action areas (`.MuiDialogActions-root`, `.modal-footer`)
+- **Smart Fallbacks**: Single enabled button detection, primary button detection
 
-# Navigate by URL pattern (substring matching)
-clits navigate --url-contains "display" --chrome-port 9222  # Matches /displays-manager
-clits navigate --url-contains "admin" --chrome-port 9222    # Matches /admin
-
-# Combine with existing options
-clits navigate --link-text "Settings" --wait-for ".settings-panel" --screenshot "settings.png"
+**Output Format:**
+```json
+{
+  "success": true,
+  "targetUrl": "http://localhost:5173/displays",
+  "targetTitle": "Display Manager",
+  "tabCount": 4,
+  "tabs": [
+    {
+      "label": "Basic Options",
+      "selector": "[aria-label=\"Basic Options\"]",
+      "index": 0,
+      "isActive": true,
+      "isDisabled": false
+    },
+    {
+      "label": "Header Options", 
+      "selector": ":contains(\"Header Options\")",
+      "index": 1,
+      "isActive": false,
+      "isDisabled": false
+    }
+  ],
+  "saveButton": {
+    "x": 450,
+    "y": 600,
+    "strategy": "text-content",
+    "text": "Save Changes"
+  }
+}
 ```
 
-**Automation Benefits:**
-- ✅ **Self-healing scripts** - No more broken automation when routes change
-- ✅ **Fuzzy matching** - "task" finds "Tasks", "display" finds "Display Manager"
-- ✅ **Error suggestions** - Shows available links when text not found
-- ✅ **CissorCLITS ready** - Perfect for dynamic test generation
+**Example Usage:**
+```bash
+# Discover all tabs in current dialog
+clits discover-tabs --chrome-port 9222
+
+# Discover tabs and click "Header Options"
+clits discover-tabs --chrome-port 9222 --tab-label "Header Options"
+
+# Regex-based tab selection
+clits discover-tabs --chrome-port 9222 --tab-label-regex "Header|Fields"
+
+# Discover tabs + find save button with custom patterns
+clits discover-tabs --chrome-port 9222 --find-save-button --custom-save-patterns "Apply,Update,Confirm"
+
+# Complete workflow: discover, select tab, find save button
+clits discover-tabs --chrome-port 9222 --tab-label "Header Options" --find-save-button
+```
+
+**Advanced Features:**
+- **Nested Tab Support**: Discovers tabs within `.MuiTabs-root` containers
+- **Active State Detection**: Shows which tab is currently selected (`aria-selected="true"`, `.Mui-selected`)
+- **Disabled State Detection**: Identifies disabled tabs (`aria-disabled="true"`, `.Mui-disabled`)
+- **Multi-Strategy Selection**: Supports selection by data-testid, aria-label, text content, or nth-child
 
 ### `clits interact`
 Interact with page elements.
@@ -325,7 +377,9 @@ Interactive website inspector for Chrome with hierarchical element navigation.
 **Features:**
 - **Hierarchical Element Navigation**: Navigate through page elements organized by DOM depth levels
 - **Enhanced Element Detection**: Finds 79+ interactive elements using 53+ selector patterns including:
-  - Material-UI components (`.MuiButton-root`, `.MuiIconButton-root`, etc.)
+  - Material-UI components (`.MuiButton-root`, `.MuiIconButton-root`, `.MuiDialog-root`, `.MuiTab-root`, `.MuiSwitch-root`)
+  - Intelligent save button detection in dialogs
+  - Tab label discovery for tabbed interfaces
   - Data attributes (`[data-testid]`, `[data-cy]`, etc.)
   - ARIA labels and roles
   - Text-based element detection
@@ -338,6 +392,12 @@ Interactive website inspector for Chrome with hierarchical element navigation.
 - **Enter**: Click selected element
 - **Esc**: Exit inspector
 
+**Material-UI Integration:**
+- **Dialog Support**: Automatic save button detection in dialogs
+- **Tab Navigation**: Discover and interact with tabbed interfaces
+- **Component Detection**: Enhanced support for Material-UI components
+- **Selector Patterns**: Robust selector patterns for all Material-UI components
+
 **Prompts:**
 - Website URL to inspect
 - Whether login is required (waits up to 30 seconds for manual login)
@@ -348,18 +408,19 @@ Interactive website inspector for Chrome with hierarchical element navigation.
   - Navigate to a new URL
   - Exit
 
-**Example Navigation:**
-```
-Level 0/4: Main page elements (7 elements)
-- Dashboard (http://localhost:5173/dashboard)
-- Zones (http://localhost:5173/zones)
-- Displays Manager (http://localhost:5173/displays)
+**Example Usage:**
+```bash
+# Basic inspection
+clits inspect --chrome-port 9222
 
-Level 1/4: More specific elements (19 elements)
-- Navigation buttons, cards, form elements
+# With Material-UI support
+clits inspect --chrome-port 9222 --mui
 
-Level 2/4: Detailed interactive elements (25+ elements)
-- Individual buttons, links, inputs within components
+# Discover tab labels
+clits inspect --chrome-port 9222 --discover-tabs
+
+# Intelligent save button detection
+clits inspect --chrome-port 9222 --smart-save
 ```
 
 ---

@@ -185,6 +185,47 @@ All OnDeck commands now work perfectly:
 
 **OnDeck can now proceed with full CLITS integration - all blocking issues resolved.**
 
+## [1.0.7-beta.3] - 2025-06-08
+
+### 🎯 Enhanced Material-UI Support & Documentation
+
+#### Added
+- **Comprehensive Material-UI Selector Support**: Enhanced element detection for Material-UI components
+  - Added support for `.MuiButton-root`, `.MuiIconButton-root`, and other Material-UI class patterns
+  - Improved detection of Material-UI form controls and interactive elements
+  - Enhanced class pattern matching for Material-UI variants and states
+
+- **Intelligent Save Button Detection**: New strategies for reliable save button identification
+  - Text-based detection for common save button labels
+  - Role and aria-label based detection
+  - Material-UI specific save button patterns
+  - Multiple fallback strategies for maximum reliability
+
+- **Tab Discovery Command**: New CLI command for discovering and interacting with tabs
+  - `clits discover-tabs` command for listing available tabs
+  - Enhanced tab metadata including titles and URLs
+  - Improved tab selection and navigation
+
+#### Enhanced
+- **Documentation Standards**: Added mandatory documentation updates for all NPM releases
+  - Comprehensive CHANGELOG entries for every version
+  - Updated README with new features and examples
+  - Feature-specific documentation updates
+  - Session priming updates with release details
+
+#### Fixed
+- **Material-UI Class Filtering**: Improved regex patterns for Material-UI class detection
+- **Documentation Consistency**: Ensured all features are properly documented
+- **Release Process**: Added documentation requirements to release workflow
+
+#### Validation
+All new features verified working:
+```bash
+✅ clits discover-tabs --chrome-port 9222                      # Tab discovery working
+✅ clits interact --chrome-port 9222 --wait-for ".MuiButton-root"  # Material-UI detection
+✅ clits interact --chrome-port 9222 --wait-for "[role='button']"  # Role-based detection
+```
+
 [1.0.0]: https://github.com/jasonvaughan/clits/releases/tag/v1.0.0
 [0.3.0]: https://github.com/jasonvaughan/clits/releases/tag/v0.3.0
 [0.2.0]: https://github.com/jasonvaughan/clits/releases/tag/v0.2.0

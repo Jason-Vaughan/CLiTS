@@ -474,28 +474,57 @@ Examples:
           if (code === 0) {
             try {
               const result = JSON.parse(output);
-              if (result.success && result.links) {
-                // Pretty print the links in the requested format
-                const formattedOutput = {
-                  links: result.links,
-                  timestamp: result.timestamp
-                };
-                console.log(JSON.stringify(formattedOutput, null, 2));
-              } else {
-                console.error(`[CLiTS-DISCOVER-LINKS] Link discovery failed: ${result.error || 'Unknown error'}`);
-                process.exit(1);
-              }
+              console.log(JSON.stringify(result, null, 2));
             } catch (parseError) {
-              console.error('[CLiTS-DISCOVER-LINKS] Failed to parse discovery result:', output);
-              process.exit(1);
+              console.log(output);
             }
           } else {
-            console.error('[CLiTS-DISCOVER-LINKS] Link discovery failed:', error);
+            console.error('[CLiTS-DISCOVER-LINKS] Discovery failed:', error);
             process.exit(1);
           }
         });
+        
       } catch (error) {
         console.error(`[CLiTS-DISCOVER-LINKS] Discovery failed: ${error instanceof Error ? error.message : String(error)}`);
+        process.exit(1);
+      }
+    });
+
+  // Discover Tabs command - convenience command for discovering tabs in dialogs
+  program
+    .command('discover-tabs')
+    .description('Discover all tab labels in dialogs or tabbed interfaces')
+    .option('--chrome-host <host>', 'Specify the host for the Chrome DevTools protocol', 'localhost')
+    .option('--chrome-port <port>', 'Specify the port for the Chrome DevTools protocol', '9222')
+    .option('--tab-label <label>', 'Select tab by label after discovery')
+    .option('--tab-label-regex <pattern>', 'Select tab by regex pattern')
+    .option('--custom-save-patterns <patterns>', 'Custom save button text patterns (comma-separated)')
+    .option('--find-save-button', 'Also discover the best save button in the current dialog')
+    .option('--verbose', 'Enable verbose output')
+    .action(async (options) => {
+      try {
+        const automation = new ChromeAutomation(
+          parseInt(options.chromePort),
+          options.chromeHost
+        );
+
+        // Use the existing interact method for tab discovery and selection
+        const result = await automation.interact({
+          discoverTabs: true,
+          findSaveButton: options.findSaveButton,
+          customSavePatterns: options.customSavePatterns ? 
+            options.customSavePatterns.split(',').map((p: string) => p.trim()) : 
+            undefined,
+          clickSelector: options.tabLabel || options.tabLabelRegex,
+          tabLabelPattern: options.tabLabelRegex,
+          chromePort: parseInt(options.chromePort),
+          chromeHost: options.chromeHost
+        });
+
+        console.log(JSON.stringify(result, null, 2));
+        
+      } catch (error) {
+        console.error(`[CLiTS-DISCOVER-TABS] Discovery failed: ${error instanceof Error ? error.message : String(error)}`);
         process.exit(1);
       }
     });

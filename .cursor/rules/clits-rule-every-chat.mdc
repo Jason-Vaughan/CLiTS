@@ -31,7 +31,17 @@ alwaysApply: false
     },
     "publishing": {
       "description": "Prepare for open-source release (clean code, clear docs, BSD compliance). CLI tool should be installable via npm (future milestone). Browser extension should be publishable to the Chrome Web Store (future milestone).",
-      "required": true
+      "required": true,
+      "documentation_requirements": {
+        "description": "Every NPM release, including beta versions, must be accompanied by comprehensive documentation updates. This includes updating CHANGELOG.md, README.md, and any relevant feature documentation. Documentation must be updated before the NPM publish command is executed.",
+        "required_updates": [
+          "CHANGELOG.md: Add detailed entry for the new version",
+          "README.md: Update features, usage examples, and installation instructions",
+          "Feature-specific docs: Update any relevant feature documentation",
+          "Session priming: Update clits_next_session_priming.md with release details"
+        ],
+        "required": true
+      }
     },
     "session_priming": {
       "description": "Use clits_next_session_priming.md for session planning and progress tracking. Every session must update this file with completed work, current state, and clear next steps for the following session. This is mandatory for seamless handoff and must be followed without user correction.",
@@ -73,6 +83,66 @@ alwaysApply: false
                 "description": "Port number where Chrome debug protocol is running",
                 "type": "integer",
                 "default": 9222
+              },
+              "include_react_hooks": {
+                "description": "Include React hook monitoring",
+                "type": "boolean"
+              },
+              "include_component_lifecycle": {
+                "description": "Include React component lifecycle tracking",
+                "type": "boolean"
+              },
+              "include_prop_changes": {
+                "description": "Include React prop change monitoring",
+                "type": "boolean"
+              },
+              "include_websockets": {
+                "description": "Include WebSocket traffic monitoring",
+                "type": "boolean"
+              },
+              "include_jwt_monitoring": {
+                "description": "Include JWT token monitoring",
+                "type": "boolean"
+              },
+              "include_graphql_monitoring": {
+                "description": "Include GraphQL request/response monitoring",
+                "type": "boolean"
+              },
+              "include_redux_monitoring": {
+                "description": "Include Redux state monitoring",
+                "type": "boolean"
+              },
+              "include_state_changes": {
+                "description": "Include Redux state change tracking",
+                "type": "boolean"
+              },
+              "include_middleware_debugging": {
+                "description": "Include Redux middleware debugging",
+                "type": "boolean"
+              },
+              "include_render_metrics": {
+                "description": "Include React render metrics",
+                "type": "boolean"
+              },
+              "include_memory_usage": {
+                "description": "Include memory usage tracking",
+                "type": "boolean"
+              },
+              "include_event_loop": {
+                "description": "Include event loop monitoring",
+                "type": "boolean"
+              },
+              "include_user_interaction": {
+                "description": "Include user interaction recording",
+                "type": "boolean"
+              },
+              "include_dom_mutation": {
+                "description": "Include DOM mutation tracking",
+                "type": "boolean"
+              },
+              "include_css_changes": {
+                "description": "Include CSS change monitoring",
+                "type": "boolean"
               }
             },
             "required": ["chrome_port"]
