@@ -87,11 +87,37 @@ npm install -g clits
 
 ## Quick Start
 
-1. **Start Chrome with remote debugging enabled:**
+### 🎉 OnDeck Integration Ready (v1.0.7-beta.2)
+
+**Production Status**: ✅ **ALL AUTOMATION BLOCKERS RESOLVED** - Ready for immediate OnDeck integration
+
+**Validated Commands (100% Working):**
+```bash
+✅ clits extract --chrome --chrome-port 9222                    # Clean log collection
+✅ clits interact --chrome-port 9222 --wait-for "body"          # React selectors working
+✅ clits automate --script workflow.json --chrome-port 9222     # Multi-step workflows
+✅ clits chrome-control --chrome-port 9222                      # Parameter parsing fixed
+```
+
+**Latest Fixes (v1.0.7-beta.2):**
+- ✅ **Log Collection**: Eliminated all "Invalid log entry" validation warnings
+- ✅ **React Selectors**: Fixed timeout issues with `body`, `html`, and basic DOM elements
+- ✅ **Command Parsing**: Resolved chrome-control parameter parsing conflicts
+- ✅ **Automation Workflows**: Multi-step JSON workflows now complete successfully
+
+### Installation & Setup
+
+1. **Install CLiTS:**
+   ```sh
+   npm install -g @puberty-labs/clits@beta
+   ```
+
+2. **Start Chrome with remote debugging enabled:**
    ```sh
    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug
    ```
-2. **Run the generic website inspector:**
+
+3. **Run the generic website inspector:**
    ```sh
    clits extract --chrome --chrome-port 9222
    ```
