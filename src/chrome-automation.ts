@@ -300,39 +300,103 @@ export class ChromeAutomation {
 
   private async connectToChrome(): Promise<CDPClient> {
     try {
-      // Check if Chrome is running with remote debugging
-      const versionResponse = await fetch(`http://${this.host}:${this.port}/json/version`);
-      if (!versionResponse.ok) {
-        throw new Error('Chrome is not running with remote debugging enabled. Start Chrome with --remote-debugging-port=9222');
-      }
-
-      // Get list of available targets
-      const response = await fetch(`http://${this.host}:${this.port}/json/list`);
-      const targets = await response.json() as Array<{
-        id: string;
-        type: string;
-        url: string;
-        webSocketDebuggerUrl?: string;
-        title: string;
-      }>;
-
-      const pageTargets = targets.filter(t => 
-        t.type === 'page' && t.webSocketDebuggerUrl
-      );
+      // Auto-launch Chrome if needed (using same logic as working clits-inspect)
+      await this.launchChromeIfNeeded();
       
-      if (pageTargets.length === 0) {
-        throw new Error('No page targets found. Please ensure Chrome is running with a tab open.');
-      }
-
-      // Connect to the first available page target using its webSocketDebuggerUrl
+      // Smart target selection with priority logic (using same logic as working clits-inspect)
+      const target = await this.autoSelectTarget();
+      
+      // Connect to the selected target using its webSocketDebuggerUrl
       const client = await CDP({ 
-        target: pageTargets[0].webSocketDebuggerUrl
+        target: target.webSocketDebuggerUrl || target.id
       }) as unknown as CDPClient;
       
       return client;
     } catch (error) {
       throw new Error(`Failed to connect to Chrome: ${error instanceof Error ? error.message : String(error)}`);
     }
+  }
+
+  private async checkChromeConnection(): Promise<boolean> {
+    try {
+      await fetch(`http://${this.host}:${this.port}/json/version`);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private async launchChromeIfNeeded(): Promise<void> {
+    const isChrome = await this.checkChromeConnection();
+    if (isChrome) {
+      return;
+    }
+
+    // Only auto-launch on macOS for now (same as working clits-inspect)
+    if (process.platform === 'darwin') {
+      console.log('Chrome is not running with remote debugging. Launching Chrome...');
+      const { spawn } = await import('child_process');
+      const chromePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+      const args = [
+        `--remote-debugging-port=${this.port}`,
+        '--user-data-dir=/tmp/chrome-debug-clits',
+        '--no-first-run',
+        '--no-default-browser-check'
+      ];
+      
+      spawn(chromePath, args, {
+        detached: true,
+        stdio: 'ignore'
+      }).unref();
+      
+      // Wait for Chrome to start
+      await new Promise(resolve => setTimeout(resolve, 4000));
+    } else {
+      throw new Error('Chrome is not running with remote debugging enabled. Start Chrome with --remote-debugging-port=9222');
+    }
+  }
+
+  private async autoSelectTarget(): Promise<any> {
+    const response = await fetch(`http://${this.host}:${this.port}/json/list`);
+    const targets = await response.json() as Array<{
+      id: string;
+      type: string;
+      url: string;
+      title: string;
+      webSocketDebuggerUrl?: string;
+    }>;
+    
+    const pageTargets = targets.filter((t: any) => t.type === 'page');
+    
+    if (pageTargets.length === 0) {
+      throw new Error('No Chrome page targets found. Please open a tab in Chrome with --remote-debugging-port=9222');
+    }
+    
+    if (pageTargets.length === 1) {
+      return pageTargets[0];
+    }
+    
+    // Smart target selection - prefer localhost/development URLs (same logic as working clits-inspect)
+    const localTargets = pageTargets.filter(t => 
+      t.url.includes('localhost') || 
+      t.url.includes('127.0.0.1') || 
+      t.url.includes('local') ||
+      t.url.startsWith('http://localhost') ||
+      t.url.startsWith('https://localhost')
+    );
+    
+    if (localTargets.length > 0) {
+      return localTargets[0];
+    }
+    
+    // Filter out chrome:// URLs as fallback
+    const nonChromeTargets = pageTargets.filter(t => !t.url.startsWith('chrome://'));
+    if (nonChromeTargets.length > 0) {
+      return nonChromeTargets[0];
+    }
+    
+    // Last resort: return first available
+    return pageTargets[0];
   }
 
   private async executeStep(client: CDPClient, step: AutomationStep, result: AutomationResult): Promise<void> {

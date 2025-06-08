@@ -75,6 +75,37 @@ async function launchChromeIfNeeded(): Promise<void> {
   }
 }
 
+// Standalone Chrome launcher for automated commands (doesn't rely on global options)
+async function launchChromeForAutomation(port: number = 9222): Promise<void> {
+  try {
+    await fetch(`http://localhost:${port}/json/version`);
+    return; // Chrome already running
+  } catch {
+    // Chrome not running, need to launch
+  }
+
+  if (os.platform() === 'darwin') {
+    console.log('Chrome is not running with remote debugging. Launching Chrome...');
+    const chromePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+    const args = [
+      `--remote-debugging-port=${port}`,
+      '--user-data-dir=/tmp/chrome-debug-clits',
+      '--no-first-run',
+      '--no-default-browser-check'
+    ];
+    
+    spawn(chromePath, args, {
+      detached: true,
+      stdio: 'ignore'
+    }).unref();
+    
+    // Wait for Chrome to start
+    await new Promise(resolve => setTimeout(resolve, 4000));
+  } else {
+    throw new Error('Auto-launch is only supported on macOS. Please start Chrome manually with --remote-debugging-port=' + port);
+  }
+}
+
 async function autoSelectTarget(): Promise<any> {
   if (options.verbose) console.log(chalk.blue(`🔗 Fetching targets from http://${options.host}:${options.port}/json/list`));
   const response = await fetch(`http://${options.host}:${options.port}/json/list`);
@@ -485,6 +516,9 @@ export async function directChromeControl(port: number = 9222, host: string = 'l
   console.log(chalk.gray('Working directly with Chrome debugging session (no Playwright)\n'));
 
   try {
+    // Auto-launch Chrome if needed (standalone version for automated commands)
+    await launchChromeForAutomation(port);
+    
     // Check Chrome connection
     const spinner = ora('Connecting to Chrome debugging session...').start();
     
