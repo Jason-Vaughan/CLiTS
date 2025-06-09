@@ -305,17 +305,32 @@ clits discover-tabs --chrome-port 9222 --tab-label "Header Options" --find-save-
 - **Disabled State Detection**: Identifies disabled tabs (`aria-disabled="true"`, `.Mui-disabled`)
 - **Multi-Strategy Selection**: Supports selection by data-testid, aria-label, text content, or nth-child
 
-### `clits interact`
-Interact with page elements.
+### `clits interact` ✨ **ENHANCED with Visual AI Features**
+**Interact with page elements using advanced visual selection methods and screenshot capabilities.**
 
-**Options:**
+#### 🔥 **NEW: Visual Element Selection (OnDeck Priority Features)**
+- `--click-text <text>`: Click element containing specific text (e.g., "Save", "Submit")
+- `--click-color <color>`: Click element with specific color (hex, rgb, or name)
+- `--click-region <region>`: Click by screen region (top-left, top-right, bottom-left, bottom-right, center)
+- `--click-description <description>`: Click by visual description (experimental AI feature)
+
+#### 📸 **NEW: Advanced Screenshot Features**
+- `--screenshot`: Take screenshot after interaction
+- `--screenshot <path>`: Take screenshot and save to specific file path
+- `--base64`: **[CRITICAL]** Output screenshot as base64 to stdout for AI processing
+- `--stdout`: Output all results to stdout in JSON format (perfect for AI automation)
+- `--fullpage`: Take full-page screenshot instead of viewport only
+- `--with-metadata`: Include element positions, text, and page metadata
+- `--annotated`: Add visual annotations (boxes around clickable elements)
+- `--selector-map`: Output map of all clickable elements with coordinates
+
+#### 🎯 **Standard Interaction Options**
 - `--click <selector>`: Click on element matching CSS selector
 - `--type <selector> <text>`: Type text into input field
 - `--toggle <selector>`: Toggle switch/checkbox elements
 - `--wait-for <selector>`: Wait for element after interaction
-- `--timeout <ms>`: Timeout in milliseconds (default: `10000`)
+- `--timeout <ms>`: Timeout in milliseconds (default: `30000`)
 - `--capture-network`: Capture network requests during interaction
-- `--screenshot <path>`: Take screenshot after interaction
 - `--chrome-host <host>`: Chrome DevTools host (default: `localhost`)
 - `--chrome-port <port>`: Chrome DevTools port (default: `9222`)
 
@@ -326,7 +341,30 @@ CLITS now supports multiple selector strategies with automatic fallback:
 - Data attributes: Automatically tries `[data-testid="selector"]`
 - ARIA labels: Automatically tries `[aria-label*="selector"]`
 
-**Examples:**
+**OnDeck Priority Examples:**
+```sh
+# 🔥 CRITICAL: Base64 screenshot output for AI processing
+clits interact --screenshot --base64     # Output base64 to stdout for AI
+clits interact --screenshot --stdout     # JSON output with screenshot data
+
+# 🎯 Visual element selection (HIGH priority)
+clits interact --click-text "Save"               # Click element containing "Save"
+clits interact --click-text "Submit"             # Click element containing "Submit"
+clits interact --click-color "#ff0000"           # Click by color
+clits interact --click-region "top-left"         # Click by screen region
+clits interact --click-description "edit button" # Click by visual description
+
+# 📸 Enhanced screenshot features (MEDIUM priority)
+clits interact --screenshot --with-metadata    # Include element positions/text
+clits interact --screenshot --annotated        # Draw boxes around clickable elements
+clits interact --screenshot --selector-map     # Output clickable element map
+clits interact --screenshot --fullpage --base64  # Full-page base64 output
+
+# 💡 Combined AI automation workflow
+clits interact --click-text "Edit" --screenshot --base64 --selector-map --stdout
+```
+
+**Standard Examples:**
 ```sh
 # Basic interaction with improved timeout (now defaults to 30s)
 clits interact --click "[data-testid='edit-btn']" --wait-for ".edit-dialog" --chrome-port 9222
@@ -379,8 +417,38 @@ clits automate --script automation.json --chrome-port 9222 --monitor --save-resu
 clits automate --script test-workflow.json --chrome-port 9222
 ```
 
+### `clits inspect` ✨ **ENHANCED with Selector Discovery**
+**Interactive website inspector with Chrome Remote Control and advanced selector discovery tools.**
+
+#### 🔍 **NEW: Selector Discovery Tools (HIGH Priority)**
+- `--find-selectors`: List all available CSS selectors on the page
+- `--find-clickable`: List all clickable elements with coordinates  
+- `--element-map`: Generate visual map of page elements
+- `--output-format <format>`: Output format: json, table, or interactive (default: interactive)
+
+**Selector Discovery Examples:**
+```sh
+# Discover all available selectors
+clits inspect --find-selectors --chrome-port 9222
+
+# Find all clickable elements with coordinates
+clits inspect --find-clickable --chrome-port 9222
+
+# Generate comprehensive element map
+clits inspect --element-map --chrome-port 9222
+
+# JSON output for AI processing
+clits inspect --find-clickable --output-format json --chrome-port 9222
+```
+
+**Standard Interactive Mode:**
+```sh
+# Launch interactive inspector (original functionality)
+clits inspect
+```
+
 ### `clits vision`
-**NEW in v1.0.8-beta.0** - Advanced visual state capture and screenshot automation with element-specific targeting.
+**Advanced visual state capture and screenshot automation with element-specific targeting.**
 
 **Options:**
 - `--screenshot`: Take screenshot(s)

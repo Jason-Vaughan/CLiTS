@@ -49,6 +49,34 @@ export interface InteractionOptions {
   findSaveButton?: boolean;
   customSavePatterns?: string[];
   tabLabelPattern?: string;
+  // Enhanced screenshot and visual features
+  takeScreenshot?: boolean;
+  base64Output?: boolean;
+  fullPageScreenshot?: boolean;
+  withMetadata?: boolean;
+  annotated?: boolean;
+  selectorMap?: boolean;
+}
+
+export interface InteractionResult {
+  success: boolean;
+  timestamp: string;
+  screenshotPath?: string;
+  screenshotBase64?: string;
+  selectorMap?: Array<{
+    selector: string;
+    text: string;
+    coordinates: { x: number; y: number };
+    boundingBox: { x: number; y: number; width: number; height: number };
+  }>;
+  metadata?: {
+    viewport: { width: number; height: number };
+    url: string;
+    title: string;
+    elementCount: number;
+  };
+  networkLogs?: any[];
+  error?: string;
 }
 
 export interface AutomationStep {
@@ -179,9 +207,13 @@ export class ChromeAutomation {
     }
   }
 
-  async interact(options: InteractionOptions): Promise<void> {
+  async interact(options: InteractionOptions): Promise<InteractionResult> {
     const client = await this.connectToChrome();
     const networkLogs: any[] = [];
+    const result: InteractionResult = {
+      success: false,
+      timestamp: new Date().toISOString()
+    };
 
     try {
       const { Page, Runtime, Network, DOM, Input } = client;
@@ -279,13 +311,37 @@ export class ChromeAutomation {
         }, null, 2));
       }
 
-      // Log network activity if captured
-      if (options.captureNetwork && networkLogs.length > 0) {
-        logger.info(`Captured ${networkLogs.length} network events during interaction`);
-        console.log(JSON.stringify(networkLogs, null, 2));
+      // Enhanced screenshot and visual features
+      if (options.takeScreenshot || options.screenshotPath) {
+        const screenshotData = await this.takeEnhancedScreenshot(client, options);
+        result.screenshotPath = screenshotData.path;
+        result.screenshotBase64 = screenshotData.base64;
       }
 
+      // Generate selector map if requested
+      if (options.selectorMap) {
+        result.selectorMap = await this.generateSelectorMap(client);
+      }
+
+      // Collect metadata if requested
+      if (options.withMetadata) {
+        result.metadata = await this.collectPageMetadata(client);
+      }
+
+      // Include network logs in result
+      if (options.captureNetwork && networkLogs.length > 0) {
+        result.networkLogs = networkLogs;
+        logger.info(`Captured ${networkLogs.length} network events during interaction`);
+      }
+
+      result.success = true;
       logger.info('Interaction completed successfully');
+      return result;
+    } catch (error) {
+      result.error = error instanceof Error ? error.message : String(error);
+      result.success = false;
+      logger.error(`Interaction failed: ${result.error}`);
+      return result;
     } finally {
       await client.close();
     }
@@ -995,5 +1051,304 @@ export class ChromeAutomation {
     }
 
     return null;
+  }
+
+  // Enhanced screenshot capabilities with base64 support
+  private async takeEnhancedScreenshot(client: CDPClient, options: InteractionOptions): Promise<{ path?: string; base64?: string }> {
+    const screenshotOptions: any = {
+      format: 'png'
+    };
+
+    if (options.fullPageScreenshot) {
+      screenshotOptions.fullPage = true;
+    }
+
+    const screenshot = await client.Page.captureScreenshot(screenshotOptions);
+    const result: { path?: string; base64?: string } = {};
+
+    if (options.base64Output) {
+      result.base64 = screenshot.data;
+    }
+
+    if (options.screenshotPath && !options.base64Output) {
+      writeFileSync(options.screenshotPath, screenshot.data, 'base64');
+      result.path = options.screenshotPath;
+      logger.info(`Enhanced screenshot saved: ${options.screenshotPath}`);
+    }
+
+    return result;
+  }
+
+  // Generate map of clickable elements with coordinates
+  private async generateSelectorMap(client: CDPClient): Promise<Array<{
+    selector: string;
+    text: string;
+    coordinates: { x: number; y: number };
+    boundingBox: { x: number; y: number; width: number; height: number };
+  }>> {
+    const result = await client.Runtime.evaluate({
+      expression: `
+        JSON.stringify((function() {
+          const selectors = [
+            'button', 'a', 'input[type="button"]', 'input[type="submit"]',
+            '[role="button"]', '[onclick]', '.MuiButton-root', '.MuiIconButton-root',
+            '.MuiFab-root', '.MuiToggleButton-root', '[data-testid]',
+            'input[type="checkbox"]', 'input[type="radio"]', 'select'
+          ];
+          
+          const elements = [];
+          selectors.forEach(selector => {
+            const nodes = document.querySelectorAll(selector);
+            nodes.forEach((element, index) => {
+              const rect = element.getBoundingClientRect();
+              const style = getComputedStyle(element);
+              
+              // Only include visible elements
+              if (rect.width > 0 && rect.height > 0 && 
+                  style.display !== 'none' && style.visibility !== 'hidden') {
+                elements.push({
+                  selector: selector + ':nth-of-type(' + (index + 1) + ')',
+                  text: element.textContent?.trim() || 
+                        element.getAttribute('aria-label') || 
+                        element.getAttribute('title') || 
+                        element.getAttribute('alt') || '',
+                  coordinates: {
+                    x: rect.left + rect.width / 2,
+                    y: rect.top + rect.height / 2
+                  },
+                  boundingBox: {
+                    x: rect.left,
+                    y: rect.top,
+                    width: rect.width,
+                    height: rect.height
+                  }
+                });
+              }
+            });
+          });
+          
+          return elements;
+        })())
+      `
+    });
+
+    if (result.result.value) {
+      return JSON.parse(result.result.value);
+    }
+    return [];
+  }
+
+  // Collect page metadata
+  private async collectPageMetadata(client: CDPClient): Promise<{
+    viewport: { width: number; height: number };
+    url: string;
+    title: string;
+    elementCount: number;
+  }> {
+    const result = await client.Runtime.evaluate({
+      expression: `
+        JSON.stringify({
+          viewport: {
+            width: window.innerWidth,
+            height: window.innerHeight
+          },
+          url: window.location.href,
+          title: document.title,
+          elementCount: document.querySelectorAll('*').length
+        })
+      `
+    });
+
+    if (result.result.value) {
+      return JSON.parse(result.result.value);
+    }
+
+    return {
+      viewport: { width: 0, height: 0 },
+      url: '',
+      title: '',
+      elementCount: 0
+    };
+  }
+
+  // Visual element selection methods
+  async findElementByText(text: string): Promise<string> {
+    // Return a selector that can be used to find elements containing the text
+    return `*:contains("${text}")`;
+  }
+
+  async findElementByColor(color: string): Promise<string> {
+    // This is a simplified implementation - in reality, you'd need to analyze computed styles
+    // For now, return a selector that looks for elements with the color in their class name or style
+    return `[style*="${color}"], [class*="${color}"]`;
+  }
+
+  async findElementByRegion(region: string): Promise<string> {
+    // Convert region to approximate CSS selectors based on viewport positioning
+    const regionMap: { [key: string]: string } = {
+      'top-left': ':first-child',
+      'top-right': ':last-child',
+      'bottom-left': ':nth-last-child(2)',
+      'bottom-right': ':last-child',
+      'center': ':nth-child(n+3):nth-last-child(n+3)'
+    };
+
+    return regionMap[region] || region;
+  }
+
+  async findElementByDescription(description: string): Promise<string> {
+    // This is experimental - use text-based matching for now
+    // In a full implementation, this could use AI vision to analyze screenshots
+    const keywords = description.toLowerCase().split(' ');
+    const commonMappings: { [key: string]: string } = {
+      'button': 'button',
+      'link': 'a',
+      'input': 'input',
+      'text': 'input[type="text"]',
+      'edit': '[contenteditable], input, textarea',
+      'save': 'button[type="submit"], button:contains("save")',
+      'close': 'button:contains("close"), .close, [aria-label*="close"]',
+      'menu': '[role="menu"], .menu',
+      'dropdown': 'select, [role="combobox"]'
+    };
+
+    for (const keyword of keywords) {
+      if (commonMappings[keyword]) {
+        return commonMappings[keyword];
+      }
+    }
+
+    // Fallback: search by text content
+    return `*:contains("${description}")`;
+  }
+
+  // Discover all CSS selectors on the page
+  async discoverAllSelectors(): Promise<string[]> {
+    const client = await this.connectToChrome();
+    
+    try {
+      const result = await client.Runtime.evaluate({
+        expression: `
+          JSON.stringify((function() {
+            const selectors = new Set();
+            const elements = document.querySelectorAll('*');
+            
+            elements.forEach(element => {
+              // Add tag selectors
+              selectors.add(element.tagName.toLowerCase());
+              
+              // Add class selectors
+              if (element.className && typeof element.className === 'string') {
+                element.className.split(' ').forEach(cls => {
+                  if (cls.trim()) selectors.add('.' + cls.trim());
+                });
+              }
+              
+              // Add ID selectors
+              if (element.id) {
+                selectors.add('#' + element.id);
+              }
+              
+              // Add attribute selectors
+              Array.from(element.attributes).forEach(attr => {
+                if (attr.name === 'data-testid') {
+                  selectors.add('[data-testid="' + attr.value + '"]');
+                }
+                if (attr.name === 'aria-label') {
+                  selectors.add('[aria-label="' + attr.value + '"]');
+                }
+                if (attr.name === 'type') {
+                  selectors.add('[type="' + attr.value + '"]');
+                }
+              });
+            });
+            
+            return Array.from(selectors).sort();
+          })())
+        `
+      });
+
+      if (result.result.value) {
+        return JSON.parse(result.result.value);
+      }
+      return [];
+    } finally {
+      await client.close();
+    }
+  }
+
+  // Generate comprehensive element map
+  async generateElementMap(): Promise<Array<{
+    tag: string;
+    selector: string;
+    text: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    isClickable: boolean;
+  }>> {
+    const client = await this.connectToChrome();
+    
+    try {
+      const result = await client.Runtime.evaluate({
+        expression: `
+          JSON.stringify((function() {
+            const elements = [];
+            const allElements = document.querySelectorAll('*');
+            
+            allElements.forEach((element, index) => {
+              const rect = element.getBoundingClientRect();
+              const style = getComputedStyle(element);
+              
+              // Only include elements in viewport with reasonable size
+              if (rect.width > 5 && rect.height > 5 && 
+                  rect.top >= 0 && rect.left >= 0 &&
+                  rect.top < window.innerHeight && rect.left < window.innerWidth &&
+                  style.display !== 'none' && style.visibility !== 'hidden') {
+                
+                const isClickable = element.tagName.toLowerCase() === 'button' ||
+                                  element.tagName.toLowerCase() === 'a' ||
+                                  element.hasAttribute('onclick') ||
+                                  element.getAttribute('role') === 'button' ||
+                                  style.cursor === 'pointer';
+                
+                let selector = element.tagName.toLowerCase();
+                if (element.id) {
+                  selector = '#' + element.id;
+                } else if (element.className && typeof element.className === 'string') {
+                  const classes = element.className.split(' ').filter(c => c.trim());
+                  if (classes.length > 0) {
+                    selector = '.' + classes[0];
+                  }
+                } else if (element.getAttribute('data-testid')) {
+                  selector = '[data-testid="' + element.getAttribute('data-testid') + '"]';
+                }
+                
+                elements.push({
+                  tag: element.tagName.toLowerCase(),
+                  selector: selector,
+                  text: element.textContent?.trim().substring(0, 50) || '',
+                  x: Math.round(rect.left + rect.width / 2),
+                  y: Math.round(rect.top + rect.height / 2),
+                  width: Math.round(rect.width),
+                  height: Math.round(rect.height),
+                  isClickable: isClickable
+                });
+              }
+            });
+            
+            return elements;
+          })())
+        `
+      });
+
+      if (result.result.value) {
+        return JSON.parse(result.result.value);
+      }
+      return [];
+    } finally {
+      await client.close();
+    }
   }
 } 

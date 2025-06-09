@@ -62,6 +62,42 @@ All visionCLITS functionality verified working:
 
 ## [Unreleased]
 
+### 🔥 **ONECK PRIORITY FEATURES - v1.0.8-beta.1**
+**Critical features requested by OnDeck for AI automation workflows**
+
+#### Added
+- **🔥 CRITICAL: Base64 Screenshot Output** - `clits interact --screenshot --base64` for AI processing
+- **🎯 Visual Element Selection (HIGH Priority)**
+  - `--click-text <text>`: Click element containing specific text (e.g., "Save", "Submit") 
+  - `--click-color <color>`: Click element with specific color (hex, rgb, or name)
+  - `--click-region <region>`: Click by screen region (top-left, top-right, bottom-left, bottom-right, center)
+  - `--click-description <description>`: Click by visual description (experimental AI feature)
+- **📸 Enhanced Screenshot Features (MEDIUM Priority)**
+  - `--with-metadata`: Include element positions, text, and page metadata in screenshot data
+  - `--annotated`: Add visual annotations (boxes around clickable elements)
+  - `--selector-map`: Output map of all clickable elements with coordinates
+  - `--stdout`: JSON output format perfect for AI automation pipelines
+  - `--fullpage`: Full-page screenshot capability integrated with interact command
+- **🔍 Selector Discovery Tools (HIGH Priority)**
+  - `clits inspect --find-selectors`: List all available CSS selectors on the page
+  - `clits inspect --find-clickable`: List all clickable elements with coordinates
+  - `clits inspect --element-map`: Generate visual map of page elements
+  - `--output-format json|table|interactive`: Flexible output formats for AI processing
+
+#### Enhanced
+- **Enhanced `clits interact` command**: Now returns structured JSON with screenshot data, element maps, and metadata
+- **Improved Documentation**: Made visionCLITS features more discoverable with prominent examples
+- **AI-First Design**: All new features designed specifically for AI automation workflows
+
+#### Examples
+```bash
+# OnDeck Priority Use Cases
+clits interact --screenshot --base64                    # CRITICAL: Base64 for AI
+clits interact --click-text "Save" --screenshot --stdout # Visual selection + JSON output
+clits inspect --find-clickable --output-format json     # Selector discovery for AI
+clits interact --screenshot --selector-map --with-metadata # Complete visual state capture
+```
+
 ### 🎯 Future Features
 - Enhanced visual diff capabilities
 - Video capture for interaction workflows

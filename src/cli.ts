@@ -329,14 +329,24 @@ Examples:
   // Interact command
   program
     .command('interact')
-    .description('Interact with page elements')
+    .description('Interact with page elements and capture visual state')
     .option('--click <selector>', 'Click on element matching CSS selector')
+    .option('--click-text <text>', 'Click element containing specific text')
+    .option('--click-color <color>', 'Click element with specific color (hex, rgb, or name)')
+    .option('--click-region <region>', 'Click by screen region (top-left, top-right, bottom-left, bottom-right, center)')
+    .option('--click-description <description>', 'Click by visual description (experimental)')
     .option('--type <selector> <text>', 'Type text into input field')
     .option('--toggle <selector>', 'Toggle switch/checkbox elements')
     .option('--wait-for <selector>', 'Wait for element after interaction')
     .option('--timeout <ms>', 'Timeout in milliseconds', '30000')
     .option('--capture-network', 'Capture network requests during interaction')
-    .option('--screenshot <path>', 'Take screenshot after interaction')
+    .option('--screenshot [path]', 'Take screenshot after interaction (optional file path)')
+    .option('--base64', 'Output screenshot as base64 to stdout')
+    .option('--stdout', 'Output results to stdout (JSON format)')
+    .option('--with-metadata', 'Include element positions and text in screenshot data')
+    .option('--annotated', 'Add visual annotations (boxes around clickable elements)')
+    .option('--selector-map', 'Output map of clickable elements with coordinates')
+    .option('--fullpage', 'Take full-page screenshot instead of viewport')
     .option('--chrome-host <host>', 'Specify the host for the Chrome DevTools protocol', 'localhost')
     .option('--chrome-port <port>', 'Specify the port for the Chrome DevTools protocol', '9222')
     .action(async (options) => {
@@ -357,20 +367,54 @@ Examples:
           }
         }
 
-        await automation.interact({
-          clickSelector: options.click,
+        // Handle visual element selection methods
+        let clickSelector = options.click;
+        if (options.clickText) {
+          // Find element by text content
+          clickSelector = await automation.findElementByText(options.clickText);
+        } else if (options.clickColor) {
+          // Find element by color
+          clickSelector = await automation.findElementByColor(options.clickColor);
+        } else if (options.clickRegion) {
+          // Find element by screen region
+          clickSelector = await automation.findElementByRegion(options.clickRegion);
+        } else if (options.clickDescription) {
+          // Find element by visual description (experimental)
+          clickSelector = await automation.findElementByDescription(options.clickDescription);
+        }
+
+        // Enhanced interaction options
+        const interactionResult = await automation.interact({
+          clickSelector,
           typeSelector,
           typeText,
           toggleSelector: options.toggle,
           waitForSelector: options.waitFor,
           timeout: parseInt(options.timeout),
           captureNetwork: options.captureNetwork,
-          screenshotPath: options.screenshot,
+          screenshotPath: typeof options.screenshot === 'string' ? options.screenshot : undefined,
+          takeScreenshot: options.screenshot !== undefined,
+          base64Output: options.base64,
+          fullPageScreenshot: options.fullpage,
+          withMetadata: options.withMetadata,
+          annotated: options.annotated,
+          selectorMap: options.selectorMap,
           chromePort: parseInt(options.chromePort),
           chromeHost: options.chromeHost
         });
 
-        console.log('[CLiTS-INTERACTOR] Interaction completed successfully');
+        // Handle output format
+        if (options.stdout || options.base64) {
+          console.log(JSON.stringify(interactionResult, null, 2));
+        } else {
+          console.log('[CLiTS-INTERACTOR] Interaction completed successfully');
+          if (interactionResult.screenshotPath) {
+            console.log(`[CLiTS-INTERACTOR] Screenshot saved: ${interactionResult.screenshotPath}`);
+          }
+          if (interactionResult.selectorMap) {
+            console.log(`[CLiTS-INTERACTOR] Found ${interactionResult.selectorMap.length} clickable elements`);
+          }
+        }
       } catch (error) {
         console.error(`[CLiTS-INTERACTOR] Interaction failed: ${error instanceof Error ? error.message : String(error)}`);
         process.exit(1);
@@ -417,10 +461,74 @@ Examples:
   // Inspect command - Interactive website inspector with Chrome Remote Control
   program
     .command('inspect')
-    .description('Interactive website inspector with Chrome Remote Control')
-    .action(async () => {
+    .description('Interactive website inspector with Chrome Remote Control and selector discovery')
+    .option('--find-selectors', 'List all available CSS selectors on the page')
+    .option('--find-clickable', 'List all clickable elements with coordinates')
+    .option('--element-map', 'Generate visual map of page elements')
+    .option('--chrome-host <host>', 'Specify the host for the Chrome DevTools protocol', 'localhost')
+    .option('--chrome-port <port>', 'Specify the port for the Chrome DevTools protocol', '9222')
+    .option('--output-format <format>', 'Output format: json, table, or interactive', 'interactive')
+    .action(async (options) => {
       try {
-        // Import and run the inspect tool
+        // Handle discovery tools
+        if (options.findSelectors || options.findClickable || options.elementMap) {
+          const automation = new ChromeAutomation(
+            parseInt(options.chromePort),
+            options.chromeHost
+          );
+
+          if (options.findSelectors) {
+            const selectors = await automation.discoverAllSelectors();
+            if (options.outputFormat === 'json') {
+              console.log(JSON.stringify({ selectors }, null, 2));
+            } else {
+              console.log('[CLiTS-INSPECTOR] Available CSS Selectors:');
+              selectors.forEach((selector: string, index: number) => {
+                console.log(`  ${index + 1}. ${selector}`);
+              });
+            }
+          }
+
+          if (options.findClickable) {
+            const interactionResult = await automation.interact({
+              selectorMap: true,
+              chromePort: parseInt(options.chromePort),
+              chromeHost: options.chromeHost
+            });
+
+            if (options.outputFormat === 'json') {
+              console.log(JSON.stringify({ clickableElements: interactionResult.selectorMap }, null, 2));
+            } else {
+              console.log('[CLiTS-INSPECTOR] Clickable Elements:');
+              interactionResult.selectorMap?.forEach((element, index) => {
+                console.log(`  ${index + 1}. ${element.selector}`);
+                console.log(`     Text: "${element.text}"`);
+                console.log(`     Coordinates: (${element.coordinates.x}, ${element.coordinates.y})`);
+                console.log(`     Bounding Box: ${element.boundingBox.width}x${element.boundingBox.height}`);
+                console.log('');
+              });
+            }
+          }
+
+          if (options.elementMap) {
+            const elementMap = await automation.generateElementMap();
+            if (options.outputFormat === 'json') {
+              console.log(JSON.stringify({ elementMap }, null, 2));
+            } else {
+              console.log('[CLiTS-INSPECTOR] Element Map:');
+              elementMap.forEach((element: any, index: number) => {
+                console.log(`  ${index + 1}. ${element.tag} - ${element.selector}`);
+                if (element.text) console.log(`     Text: "${element.text}"`);
+                console.log(`     Position: (${element.x}, ${element.y})`);
+                console.log('');
+              });
+            }
+          }
+
+          return;
+        }
+
+        // Original interactive inspector
         const { main: runInspect } = await import('./cli-inspect.js');
         await runInspect();
       } catch (error) {
@@ -577,8 +685,16 @@ Examples:
     .option('--timeout <ms>', 'Timeout in milliseconds', '30000')
     .action(async (options) => {
       try {
-        // Import and run vision handler
-        const { VisionHandler } = await import('./vision-handler.js');
+        // Dynamic import to handle module resolution issues
+        let VisionHandler: any;
+        try {
+          const visionModule = await import('./vision-handler.js');
+          VisionHandler = visionModule.VisionHandler;
+        } catch (importError) {
+          console.error('[CLiTS-VISION] Vision handler not available. Please ensure the module is built properly.');
+          process.exit(1);
+        }
+
         const visionHandler = new VisionHandler(
           parseInt(options.chromePort),
           options.chromeHost
