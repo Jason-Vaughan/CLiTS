@@ -1,76 +1,97 @@
 # CLiTS Project Session Priming
 
-## 🎉 **LATEST SESSION - ONDECK FIXES 100% COMPLETE**
+## �� **LATEST SESSION - VISIONCLITS FEATURE PLANNING**
 
 ### **Session Date**: June 8, 2025
-### **Current Version**: v1.0.7-beta.2 (✅ PUBLISHED TO NPM)
-### **Session Status**: ✅ **100% COMPLETE** - ALL ONDECK BLOCKERS ELIMINATED
+### **Current Version**: v1.0.7-beta.3 (✅ PUBLISHED TO NPM)
+### **Session Status**: ✅ **100% COMPLETE** - VISIONCLITS ROADMAP INTEGRATED
 
-## 🔥 **FINAL ONDECK INTEGRATION - PRODUCTION READY**
-**🎉 ALL AUTOMATION BLOCKERS RESOLVED - OnDeck Ready for Full Integration**
+## 🔥 **NEXT SESSION - VISIONCLITS IMPLEMENTATION**
+**🎯 Starting visionCLITS Development - Visual State Capture Module**
 
-### Issue #1: `interact` Command Selector Timeout ✅ FIXED
-- **Problem**: `clits interact --chrome-port 9222 --wait-for "body"` timing out on basic selectors
-- **Root Cause**: JavaScript template literal syntax errors causing `SyntaxError: Unexpected identifier 'body'`
-- **Fix**: Complete rewrite of `findElementWithFallback` method with special basic element handling
-- **Status**: Basic selectors (`body`, `html`, `head`) now work reliably
+### Phase 1: Core Screenshot Features
+- [ ] **Dedicated Command Implementation**
+  - [ ] Create new `clits vision` command structure
+  - [ ] Implement basic screenshot capture
+  - [ ] Add CSS selector support
+  - [ ] Add full-page screenshot option
+  - [ ] Implement base64/stdout output
 
-### Issue #2: `chrome-control` Parameter Parsing ✅ FIXED
-- **Problem**: `clits chrome-control --chrome-port 9222` showing "unknown option" error
-- **Root Cause**: Commander.js conflicts with completion command registration
-- **Fix**: Disabled completion command causing parsing conflicts
-- **Status**: Works reliably in all tested contexts
+- [ ] **Element Detection & Capture**
+  - [ ] Enhance element bounding box detection
+  - [ ] Add visibility state checking
+  - [ ] Implement text content extraction
+  - [ ] Add computed style capture
+  - [ ] Create JSON metadata output
 
-### Issue #3: `automate` Workflow Failures ✅ FIXED
-- **Problem**: Automation workflows failing on wait/selector steps with timeout errors
-- **Root Cause**: Same selector finding bug affecting all automation operations  
-- **Fix**: Enhanced element detection throughout automation framework
-- **Status**: Multi-step workflows now complete successfully (2/2 steps validated)
+### Phase 2: Integration & Testing
+- [ ] **Command Chaining**
+  - [ ] Integrate with navigation commands
+  - [ ] Add interaction support
+  - [ ] Implement error handling
+  - [ ] Add context screenshots
 
-### Issue #4: Log Collection Validation Warnings ✅ FIXED
-- **Problem**: "Invalid log entry: missing or invalid level property" warnings causing output pollution
-- **Root Cause**: Console logs with nested `details.message.level` structure not properly handled
-- **Fix**: Enhanced log level parsing to handle both direct and nested level properties
-- **Status**: Clean log collection with 0 validation warnings
+- [ ] **AI Integration**
+  - [ ] Design AI-friendly output format
+  - [ ] Add batch processing support
+  - [ ] Implement comprehensive logging
+  - [ ] Create example workflows
 
 ## 📦 **NPM PUBLICATION STATUS**
-- **Version**: v1.0.7-beta.2
+- **Version**: v1.0.7-beta.3
 - **Tag**: beta
 - **Status**: ✅ PUBLISHED SUCCESSFULLY
 - **Installation**: `npm install -g @puberty-labs/clits@beta`
-- **OnDeck Ready**: ✅ **100% CLEARED FOR INTEGRATION**
+- **Next Version**: v1.0.9-beta.2 (visionCLITS)
 
-## 🛠 **TECHNICAL IMPLEMENTATION SUMMARY**
-**All Critical OnDeck Fixes Applied:**
-- Enhanced `findElementWithFallback()` with basic element special handling (v1.0.7-beta.1)
-- Fixed JavaScript code generation to prevent template literal syntax errors (v1.0.7-beta.1)
-- Disabled conflicting completion command for parameter parsing (v1.0.7-beta.1)
-- Enhanced log level validation for nested console message structures (v1.0.7-beta.2)
-- Comprehensive error handling and fallback strategies throughout
+## 🛠 **TECHNICAL IMPLEMENTATION PLAN**
+**visionCLITS Core Components:**
+1. **Command Structure**
+   ```bash
+   clits vision --screenshot --selector "<css-selector>" --output "<file-path>" [--fullpage]
+   clits vision --screenshot --selectors ".error,.warning" --output-dir "./screens"
+   clits vision --screenshot --selector ".sheet-preview" --output "preview.png" --meta "preview.json"
+   ```
 
-## 📚 **COMPREHENSIVE DOCUMENTATION UPDATED**
-- ✅ **CHANGELOG.md**: Complete v1.0.7-beta.2 technical fixes entry
-- ✅ **README.md**: OnDeck integration ready section with validated commands
-- ✅ **package.json**: Version updated to v1.0.7-beta.2
-- ✅ **NPM Published**: All changes live on NPM registry
-- ✅ **Git Ready**: All documentation updates committed and ready
+2. **Integration Points**
+   - Leverage existing `ChromeAutomation` screenshot capabilities
+   - Extend with element-specific capture
+   - Add metadata extraction
+   - Implement AI-friendly output
 
-## 🚀 **VALIDATION RESULTS - 100% WORKING**
-All OnDeck validation commands now pass perfectly:
-```bash
-✅ clits extract --chrome --chrome-port 9222                    # Clean log collection, no warnings
-✅ clits interact --chrome-port 9222 --wait-for "body"          # React selectors working reliably  
-✅ clits automate --script workflow.json --chrome-port 9222     # Multi-step workflows complete successfully
-✅ clits chrome-control --chrome-port 9222                      # Parameter parsing resolved completely
-```
+3. **Testing Strategy**
+   - Unit tests for each component
+   - Integration tests with navigation
+   - Visual regression testing
+   - AI workflow validation
 
-**OnDeck Integration Status**: ✅ **PRODUCTION READY - PROCEED WITH CONFIDENCE**
+## 📚 **DOCUMENTATION UPDATES**
+- ✅ **ROADMAP.md**: Added visionCLITS feature plan
+- ✅ **CHANGELOG.md**: Added upcoming feature details
+- ✅ **README.md**: Updated features section
+- ✅ **Git Ready**: All documentation updates committed
 
-## 🏁 **PREVIOUS SESSION - Console Log Collection Issues RESOLVED**
+## 🚀 **NEXT SESSION PRIORITIES**
+1. **Command Structure Setup**
+   - Create new command file
+   - Implement basic screenshot capture
+   - Add selector support
+
+2. **Element Detection**
+   - Enhance bounding box detection
+   - Add visibility checking
+   - Implement metadata extraction
+
+3. **Testing Framework**
+   - Set up test structure
+   - Create initial test cases
+   - Implement validation
+
+## 🏁 **PREVIOUS SESSION - ONDECK FIXES 100% COMPLETE**
 
 ### **Previous Session Date**: June 8, 2025
-### **Previous Version**: v1.0.6-beta.4 (Published to NPM)
-### **Previous Achievements**: ✅ COMPLETED - ALL LOG COLLECTION ISSUES FIXED
+### **Previous Version**: v1.0.7-beta.2 (Published to NPM)
+### **Previous Achievements**: ✅ COMPLETED - ALL ONDECK BLOCKERS ELIMINATED
 
 **Major Accomplishments:**
 1. **✅ Fixed Console Log Parsing**: Resolved nested `details.message.level` structure validation

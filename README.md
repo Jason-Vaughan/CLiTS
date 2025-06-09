@@ -55,6 +55,13 @@
 - **Browser Automation**: Navigate to URLs, interact with elements, and run scripted automation workflows
 - **Screenshot Capture**: Take full-page screenshots during navigation and interactions
 - **Network Monitoring**: Capture network requests and responses during automation
+- **visionCLITS** (Coming in v1.0.9-beta.2): Advanced visual state capture and screenshot automation
+  - Element-specific screenshots with CSS selector support
+  - Full-page screenshot capability
+  - Base64/stdout output for AI integration
+  - Batch screenshot mode for multiple selectors
+  - Visual state metadata extraction
+  - AI-friendly output formats
 - Generic website inspection with automatic log collection
 - Console, network, and DOM inspection
 - Advanced Logging (Structured logging with metadata, log rotation and size management, timestamp synchronization)

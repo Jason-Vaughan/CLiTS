@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### 🎯 Planned Features
+- **visionCLITS**: New module for visual state capture and screenshot automation
+  - Dedicated `clits vision` command for visual capture
+  - Element-specific screenshots with CSS selector support
+  - Full-page screenshot capability
+  - Base64/stdout output for AI integration
+  - Batch screenshot mode for multiple selectors
+  - Visual state metadata extraction
+  - AI-friendly output formats
+  - Comprehensive documentation and examples
+
 ## [1.0.7-beta.1] - 2025-06-08
 
 ### 🚨 CRITICAL AUTOMATION FIXES - OnDeck Integration Ready

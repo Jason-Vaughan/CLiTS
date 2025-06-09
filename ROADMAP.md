@@ -48,6 +48,34 @@ This document outlines the development plans and future features for CLiTS (Chro
   - [ ] Add verbose/debug output and dry-run mode
   - [ ] Enhanced error messages and troubleshooting
 
+### v1.0.9-beta.2 (Planned)
+- [ ] **visionCLITS - Visual State Capture**
+  - [ ] **Core Screenshot Features**
+    - [ ] Dedicated `clits vision` command for visual capture
+    - [ ] Element-specific screenshots with CSS selector support
+    - [ ] Full-page screenshot capability
+    - [ ] Base64/stdout output for AI integration
+    - [ ] Batch screenshot mode for multiple selectors
+
+  - [ ] **Visual State Metadata**
+    - [ ] Element bounding box extraction
+    - [ ] Visibility state detection
+    - [ ] Text content capture
+    - [ ] Computed style information
+    - [ ] JSON metadata output
+
+  - [ ] **Integration Features**
+    - [ ] Chainable with navigation/interaction commands
+    - [ ] Error handling with context screenshots
+    - [ ] Comprehensive logging and traceability
+    - [ ] AI-friendly output formats
+
+  - [ ] **Documentation & Examples**
+    - [ ] CLI usage examples
+    - [ ] AI integration patterns
+    - [ ] Visual regression testing guide
+    - [ ] Remote debugging workflows
+
 ## Medium-term Goals (Next 3-6 Months)
 
 ### v1.1.0 (Planned)
