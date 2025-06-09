@@ -30,6 +30,9 @@ Examples:
   $ clits interact --click "[data-testid='edit-btn']" --wait-for ".edit-dialog" --capture-network
   $ clits automate --script automation.json --monitor --save-results results.json
   $ clits discover-links --chrome-port 9222
+  $ clits vision --screenshot --selector ".error-message" --output "error.png" --meta "error.json"
+  $ clits vision --screenshot --selectors ".error,.warning" --output-dir "./screenshots"
+  $ clits vision --screenshot --fullpage --output "page.png" --base64
     `);
 
   program
@@ -548,6 +551,42 @@ Examples:
         await directChromeControl(port, host);
       } catch (error) {
         console.error(`[CLiTS-CHROME-CONTROL] Chrome control failed: ${error instanceof Error ? error.message : String(error)}`);
+        process.exit(1);
+      }
+    });
+
+  // VisionCLITS - Advanced visual state capture and screenshot automation
+  program
+    .command('vision')
+    .description('Visual state capture and screenshot automation')
+    .option('--screenshot', 'Take screenshot(s)')
+    .option('--selector <selector>', 'CSS selector for element-specific screenshot')
+    .option('--selectors <selectors>', 'Multiple CSS selectors (comma-separated)')
+    .option('--output <path>', 'Output file path for screenshot')
+    .option('--output-dir <dir>', 'Output directory for multiple screenshots')
+    .option('--meta <path>', 'Output JSON metadata file path')
+    .option('--fullpage', 'Take full-page screenshot')
+    .option('--base64', 'Output screenshot as base64 to stdout')
+    .option('--stdout', 'Output results to stdout (JSON format)')
+    .option('--include-text', 'Include text content in metadata')
+    .option('--include-styles', 'Include computed styles in metadata')
+    .option('--include-bbox', 'Include bounding box information')
+    .option('--include-visibility', 'Include visibility state information')
+    .option('--chrome-host <host>', 'Specify the host for the Chrome DevTools protocol', 'localhost')
+    .option('--chrome-port <port>', 'Specify the port for the Chrome DevTools protocol', '9222')
+    .option('--timeout <ms>', 'Timeout in milliseconds', '30000')
+    .action(async (options) => {
+      try {
+        // Import and run vision handler
+        const { VisionHandler } = await import('./vision-handler.js');
+        const visionHandler = new VisionHandler(
+          parseInt(options.chromePort),
+          options.chromeHost
+        );
+
+        await visionHandler.execute(options);
+      } catch (error) {
+        console.error(`[CLiTS-VISION] Vision command failed: ${error instanceof Error ? error.message : String(error)}`);
         process.exit(1);
       }
     });

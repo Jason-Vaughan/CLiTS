@@ -48,33 +48,33 @@ This document outlines the development plans and future features for CLiTS (Chro
   - [ ] Add verbose/debug output and dry-run mode
   - [ ] Enhanced error messages and troubleshooting
 
-### v1.0.9-beta.2 (Planned)
-- [ ] **visionCLITS - Visual State Capture**
-  - [ ] **Core Screenshot Features**
-    - [ ] Dedicated `clits vision` command for visual capture
-    - [ ] Element-specific screenshots with CSS selector support
-    - [ ] Full-page screenshot capability
-    - [ ] Base64/stdout output for AI integration
-    - [ ] Batch screenshot mode for multiple selectors
+### v1.0.8-beta.0 (Completed)
+  - [x] **visionCLITS - Visual State Capture** ✅ COMPLETED
+        - [x] **Core Screenshot Features** ✅ COMPLETED
+      - [x] Dedicated `clits vision` command for visual capture
+      - [x] Element-specific screenshots with CSS selector support
+      - [x] Full-page screenshot capability
+      - [x] Base64/stdout output for AI integration
+      - [x] Batch screenshot mode for multiple selectors
 
-  - [ ] **Visual State Metadata**
-    - [ ] Element bounding box extraction
-    - [ ] Visibility state detection
-    - [ ] Text content capture
-    - [ ] Computed style information
-    - [ ] JSON metadata output
+  - [x] **Visual State Metadata** ✅ COMPLETED
+    - [x] Element bounding box extraction
+    - [x] Visibility state detection
+    - [x] Text content capture
+    - [x] Computed style information
+    - [x] JSON metadata output
 
-  - [ ] **Integration Features**
-    - [ ] Chainable with navigation/interaction commands
-    - [ ] Error handling with context screenshots
-    - [ ] Comprehensive logging and traceability
-    - [ ] AI-friendly output formats
+  - [x] **Integration Features** ✅ COMPLETED
+    - [x] Chainable with navigation/interaction commands
+    - [x] Error handling with context screenshots
+    - [x] Comprehensive logging and traceability
+    - [x] AI-friendly output formats
 
-  - [ ] **Documentation & Examples**
-    - [ ] CLI usage examples
-    - [ ] AI integration patterns
-    - [ ] Visual regression testing guide
-    - [ ] Remote debugging workflows
+  - [x] **Documentation & Examples** ✅ COMPLETED
+    - [x] CLI usage examples
+    - [x] AI integration patterns
+    - [x] Visual regression testing guide
+    - [x] Remote debugging workflows
 
 ## Medium-term Goals (Next 3-6 Months)
 

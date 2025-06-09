@@ -5,18 +5,67 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.8-beta.0] - 2025-06-09
+
+### 🔥 NEW: visionCLITS - Visual State Capture Module ✅ FULLY IMPLEMENTED
+
+#### Added
+- **✅ VisionCLITS Command**: New `clits vision` command for advanced visual state capture and screenshot automation
+- **✅ Element-Specific Screenshots**: CSS selector support for targeted element captures with precise bounding box detection
+- **✅ Full-Page Screenshot Capability**: Complete page capture functionality with base64 and file output options
+- **✅ Multiple Selector Support**: Batch processing for multiple elements with `--selectors` option
+- **✅ Visual State Metadata**: Comprehensive element analysis including:
+  - Bounding box coordinates and dimensions
+  - Visibility state checking and validation
+  - Text content extraction (`--include-text`)
+  - Computed style capture (`--include-styles`)
+  - Element existence verification
+- **✅ AI-Friendly Output**: Structured JSON output perfect for AI automation workflows
+- **✅ Flexible Output Options**: Support for file paths, directories, base64 encoding, and stdout
+- **✅ Error Handling**: Robust error reporting for missing or non-visible elements
+
+#### New CLI Commands
+```bash
+# Element-specific screenshot with metadata
+clits vision --screenshot --selector ".error-message" --output "error.png" --meta "error.json"
+
+# Multiple selectors with batch processing
+clits vision --screenshot --selectors ".error,.warning" --output-dir "./screenshots"
+
+# Full-page screenshot with base64 output
+clits vision --screenshot --fullpage --output "page.png" --base64
+
+# Comprehensive element analysis
+clits vision --screenshot --selector ".button" --include-text --include-styles --include-bbox --meta "analysis.json"
+
+# JSON output to stdout for AI integration
+clits vision --screenshot --selectors "h1,button" --stdout
+```
+
+#### Technical Implementation
+- **Chrome DevTools Integration**: Uses existing chrome-remote-interface for reliable screenshot capture
+- **Element Detection**: Leverages proven element detection strategies from CLiTS automation framework
+- **Metadata Extraction**: Complete element property analysis with computed styles and text content
+- **Output Management**: Automatic directory creation and file path management
+- **Error Recovery**: Graceful handling of non-existent or hidden elements
+
+#### Validation Results
+All visionCLITS functionality verified working:
+```bash
+✅ clits vision --screenshot --fullpage --output "test.png"                    # Full-page capture
+✅ clits vision --screenshot --selector "body" --include-text --meta "test.json"  # Element capture
+✅ clits vision --screenshot --selectors "h1,button" --output-dir "screenshots"    # Batch processing
+✅ clits vision --screenshot --selector ".element" --base64 --stdout               # AI integration
+```
+
+**visionCLITS is production-ready and fully integrated into the CLiTS automation framework.**
+
 ## [Unreleased]
 
-### 🎯 Planned Features
-- **visionCLITS**: New module for visual state capture and screenshot automation
-  - Dedicated `clits vision` command for visual capture
-  - Element-specific screenshots with CSS selector support
-  - Full-page screenshot capability
-  - Base64/stdout output for AI integration
-  - Batch screenshot mode for multiple selectors
-  - Visual state metadata extraction
-  - AI-friendly output formats
-  - Comprehensive documentation and examples
+### 🎯 Future Features
+- Enhanced visual diff capabilities
+- Video capture for interaction workflows
+- Advanced element highlighting and annotation
 
 ## [1.0.7-beta.1] - 2025-06-08
 

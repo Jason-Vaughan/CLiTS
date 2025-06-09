@@ -55,11 +55,12 @@
 - **Browser Automation**: Navigate to URLs, interact with elements, and run scripted automation workflows
 - **Screenshot Capture**: Take full-page screenshots during navigation and interactions
 - **Network Monitoring**: Capture network requests and responses during automation
-- **visionCLITS** (Coming in v1.0.9-beta.2): Advanced visual state capture and screenshot automation
-  - Element-specific screenshots with CSS selector support
-  - Full-page screenshot capability
-  - Base64/stdout output for AI integration
-  - Batch screenshot mode for multiple selectors
+- **visionCLITS** (✅ Available in v1.0.8-beta.0): Advanced visual state capture and screenshot automation
+- Element-specific screenshots with CSS selector support
+- Full-page screenshot capability with metadata extraction
+- Base64/stdout output for AI integration
+- Batch screenshot mode for multiple selectors
+- Visual state analysis with element detection and validation
   - Visual state metadata extraction
   - AI-friendly output formats
 - Generic website inspection with automatic log collection
@@ -377,6 +378,77 @@ clits automate --script automation.json --chrome-port 9222 --monitor --save-resu
 # Quick automation validation
 clits automate --script test-workflow.json --chrome-port 9222
 ```
+
+### `clits vision`
+**NEW in v1.0.8-beta.0** - Advanced visual state capture and screenshot automation with element-specific targeting.
+
+**Options:**
+- `--screenshot`: Take screenshot(s)
+- `--selector <selector>`: CSS selector for element-specific screenshot
+- `--selectors <selectors>`: Multiple CSS selectors (comma-separated)
+- `--output <path>`: Output file path for screenshot
+- `--output-dir <dir>`: Output directory for multiple screenshots
+- `--meta <path>`: Output JSON metadata file path
+- `--fullpage`: Take full-page screenshot
+- `--base64`: Output screenshot as base64 to stdout
+- `--stdout`: Output results to stdout (JSON format)
+- `--include-text`: Include text content in metadata
+- `--include-styles`: Include computed styles in metadata
+- `--include-bbox`: Include bounding box information
+- `--include-visibility`: Include visibility state information
+- `--chrome-host <host>`: Chrome DevTools host (default: `localhost`)
+- `--chrome-port <port>`: Chrome DevTools port (default: `9222`)
+- `--timeout <ms>`: Timeout in milliseconds (default: `30000`)
+
+**Visual State Metadata:**
+VisionCLITS captures comprehensive element information:
+```json
+{
+  "selector": ".error-message",
+  "exists": true,
+  "visible": true,
+  "boundingBox": {
+    "x": 100, "y": 200, "width": 300, "height": 50,
+    "top": 200, "left": 100, "right": 400, "bottom": 250
+  },
+  "textContent": "Error: Connection failed",
+  "computedStyles": {
+    "display": "block", "visibility": "visible", "opacity": "1",
+    "position": "absolute", "backgroundColor": "rgb(255, 0, 0)",
+    "color": "rgb(255, 255, 255)", "fontSize": "14px"
+  },
+  "screenshotPath": "error_0.png"
+}
+```
+
+**Examples:**
+```sh
+# Element-specific screenshot with metadata
+clits vision --screenshot --selector ".error-message" --output "error.png" --meta "error.json"
+
+# Multiple selectors with batch processing
+clits vision --screenshot --selectors ".error,.warning" --output-dir "./screenshots"
+
+# Full-page screenshot with base64 output
+clits vision --screenshot --fullpage --output "page.png" --base64
+
+# Comprehensive element analysis
+clits vision --screenshot --selector ".button" --include-text --include-styles --include-bbox --meta "analysis.json"
+
+# JSON output to stdout for AI integration
+clits vision --screenshot --selectors "h1,button" --stdout
+
+# Visual state capture for debugging
+clits vision --screenshot --selector ".dialog" --include-text --include-visibility --meta "debug.json"
+```
+
+**AI Integration:**
+VisionCLITS is designed for AI-driven visual debugging:
+- **Automated Visual State Capture**: No manual intervention required
+- **Structured JSON Output**: Perfect for AI analysis and decision-making
+- **Element Validation**: Automatic visibility and existence checking
+- **Batch Processing**: Handle multiple elements efficiently
+- **Error Handling**: Graceful failures with detailed error reporting
 
 ### `clits-inspect`
 Interactive website inspector for Chrome with hierarchical element navigation.
