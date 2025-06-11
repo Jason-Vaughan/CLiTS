@@ -1,12 +1,15 @@
 {
   "name": "@puberty-labs/clits",
-  "version": "1.0.8",
-  "description": "AI-First Chrome debugging tool with zero-interaction automation framework. Auto-launch Chrome, detect elements, click interactions, capture logs - all via JSON API perfect for AI assistants.",
+  "version": "1.0.9-beta.14",
+  "description": "CLiTS (Chrome Logging and Inspection Tool Suite) is a powerful Node.js library for automated Chrome browser testing, logging, and inspection. It provides a comprehensive suite of tools for monitoring network requests, console logs, DOM mutations, and more.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "logo": "assets/CLiTS Logo.png",
-  "homepage": "https://github.com/Jason-Vaughan/CLiTS#readme",
+  "logo": "assets/logo.png",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jason-Vaughan/CLiTS.git"
+  },
   "exports": {
     ".": {
       "import": "./dist/index.js",
@@ -63,12 +66,8 @@
   ],
   "author": "Jason Vaughan",
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/jasonvaughan/clits.git"
-  },
   "bugs": {
-    "url": "https://github.com/jasonvaughan/clits/issues"
+    "url": "https://github.com/Jason-Vaughan/CLiTS/issues"
   },
   "engines": {
     "node": ">=20"

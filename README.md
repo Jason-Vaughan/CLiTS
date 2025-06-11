@@ -1,7 +1,7 @@
 # CLiTS - Chrome Log Inspector & Troubleshooting System
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Jason-Vaughan/CLiTS/main/assets/CLiTS%20Logo.png" alt="CLITS Logo" width="400"/>
+  <img src="https://raw.githubusercontent.com/Jason-Vaughan/CLiTS/main/assets/CLiTS%20Logo.png" alt="CLiTS Logo" width="320"/>
 </p>
 
 <!-- Badges: npm version, build status, license, etc. -->
