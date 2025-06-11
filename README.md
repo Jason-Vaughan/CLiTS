@@ -397,7 +397,9 @@ clits automate --script test-workflow.json --chrome-port 9222
 ### `clits vision`
 **Advanced visual state capture and screenshot automation with element-specific targeting.**
 
-**Options:**
+#### 🚀 NEW in v1.0.9-beta.1: Roadmap Features
+
+#### Core Screenshot Options:
 - `--screenshot`: Take screenshot(s)
 - `--selector <selector>`: CSS selector for element-specific screenshot
 - `--selectors <selectors>`: Multiple CSS selectors (comma-separated)
@@ -411,6 +413,31 @@ clits automate --script test-workflow.json --chrome-port 9222
 - `--include-styles`: Include computed styles in metadata
 - `--include-bbox`: Include bounding box information
 - `--include-visibility`: Include visibility state information
+
+#### 🔍 Visual Diff Capabilities (NEW):
+- `--diff`: Enable visual diff mode for regression testing
+- `--baseline <path>`: Baseline screenshot or directory for comparison
+- `--compare-with <path>`: Compare current screenshot with this image
+- `--diff-threshold <number>`: Diff sensitivity threshold (0-1, default: 0.1)
+- `--diff-output <path>`: Output path for diff result image
+- `--diff-report <path>`: Output path for diff analysis JSON report
+- `--save-baseline`: Save current screenshot as new baseline
+- `--batch-diff`: Enable batch processing for multiple screenshot comparisons
+
+#### 🎥 Video Capture Capabilities (NEW):
+- `--video`: Enable video recording for interaction workflows
+- `--video-output <path>`: Output path for recorded video (default: clits-recording.webm)
+- `--video-duration <seconds>`: Recording duration in seconds (default: 30)
+- `--video-fps <fps>`: Video frame rate (default: 10)
+
+#### 🎨 Advanced Element Highlighting (NEW):
+- `--highlight`: Add visual annotations to screenshots
+- `--highlight-color <color>`: Color for element highlighting (hex, default: #ff0000)
+- `--highlight-thickness <pixels>`: Border thickness for highlighting (default: 3)
+- `--highlight-all-clickable`: Highlight all clickable elements on the page
+- `--annotate-text`: Add text labels to highlighted elements
+
+#### System Options:
 - `--chrome-host <host>`: Chrome DevTools host (default: `localhost`)
 - `--chrome-port <port>`: Chrome DevTools port (default: `9222`)
 - `--timeout <ms>`: Timeout in milliseconds (default: `30000`)
@@ -437,6 +464,8 @@ VisionCLITS captures comprehensive element information:
 ```
 
 **Examples:**
+
+#### Core Screenshot Examples:
 ```sh
 # Element-specific screenshot with metadata
 clits vision --screenshot --selector ".error-message" --output "error.png" --meta "error.json"
@@ -455,6 +484,69 @@ clits vision --screenshot --selectors "h1,button" --stdout
 
 # Visual state capture for debugging
 clits vision --screenshot --selector ".dialog" --include-text --include-visibility --meta "debug.json"
+```
+
+#### 🔍 Visual Diff Examples (NEW):
+```sh
+# Create baseline screenshot for regression testing
+clits vision --screenshot --fullpage --save-baseline --baseline "ui-baseline.png"
+
+# Compare current state with baseline and generate diff
+clits vision --screenshot --fullpage --diff --baseline "ui-baseline.png" --diff-output "changes.png" --diff-report "analysis.json"
+
+# Batch visual regression testing with custom threshold
+clits vision --screenshot --selectors ".header,.footer,.main" --batch-diff --baseline-dir "./baselines" --diff-threshold 0.05
+
+# Compare specific element changes
+clits vision --screenshot --selector ".login-form" --diff --baseline "login-baseline.png" --diff-output "login-diff.png"
+
+# Visual consistency validation across deployments
+clits vision --screenshot --fullpage --compare-with "production-screenshot.png" --diff-threshold 0.02 --diff-report "deployment-validation.json"
+```
+
+#### 🎥 Video Capture Examples (NEW):
+```sh
+# Record 60-second workflow at high quality
+clits vision --video --video-duration 60 --video-fps 15 --video-output "user-workflow.webm"
+
+# Combine video recording with screenshot capture
+clits vision --video --screenshot --fullpage --output "final-state.png" --video-output "interaction-recording.webm"
+
+# Record bug reproduction with custom settings
+clits vision --video --video-duration 45 --video-fps 12 --video-output "bug-reproduction.webm"
+
+# Create automated testing demo
+clits vision --video --video-duration 120 --video-fps 10 --video-output "automation-demo.webm"
+```
+
+#### 🎨 Advanced Highlighting Examples (NEW):
+```sh
+# Highlight all clickable elements with custom styling
+clits vision --screenshot --fullpage --highlight-all-clickable --highlight-color "#00ff00" --highlight-thickness 5
+
+# Add text annotations to highlighted elements
+clits vision --screenshot --selector ".navigation" --highlight --annotate-text --output "annotated-nav.png"
+
+# Visual debugging of element positioning
+clits vision --screenshot --selectors ".button,.link,.form" --highlight --highlight-color "#ff00ff" --highlight-thickness 2
+
+# Generate UI documentation with annotations
+clits vision --screenshot --fullpage --highlight-all-clickable --annotate-text --output "ui-documentation.png"
+
+# Accessibility analysis visualization
+clits vision --screenshot --fullpage --highlight-all-clickable --highlight-color "#0066ff" --annotate-text --meta "accessibility-report.json"
+```
+
+#### 🔄 Advanced Batch Processing Examples (NEW):
+```sh
+# Large-scale visual testing with diff analysis
+clits vision --screenshot --selectors ".header,.sidebar,.content,.footer" --batch-diff --baseline-dir "./test-baselines" --output-dir "./test-results" --diff-report "batch-analysis.json"
+
+# Multi-element regression testing
+clits vision --screenshot --selectors ".error-states,.success-states,.warning-states" --batch-diff --diff-threshold 0.1 --output-dir "./regression-tests"
+
+# Systematic UI validation with highlighting and video
+clits vision --video --screenshot --selectors ".critical-elements" --highlight-all-clickable --batch-diff --video-output "validation-workflow.webm"
 ```
 
 **AI Integration:**

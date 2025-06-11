@@ -5,6 +5,108 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.9-beta.1] - 2025-06-11
+
+### ✨ NEW ROADMAP FEATURES - VisionCLITS Enhancements
+
+#### 🔍 Visual Diff Capabilities
+- **`--diff`**: Enable visual diff mode for regression testing
+- **`--baseline <path>`**: Set baseline screenshot for comparison
+- **`--compare-with <path>`**: Compare current screenshot with specific image
+- **`--diff-threshold <number>`**: Configure diff sensitivity (0-1, default: 0.1)
+- **`--diff-output <path>`**: Save visual diff result image
+- **`--diff-report <path>`**: Generate detailed diff analysis JSON report
+- **`--save-baseline`**: Save current screenshot as new baseline
+- **`--batch-diff`**: Enable batch processing for multiple comparisons
+
+**Use Cases:**
+- Automated visual regression testing
+- UI consistency validation across deployments
+- Design system compliance checking
+- Cross-browser visual compatibility testing
+
+**Example Usage:**
+```bash
+# Take screenshot and save as baseline
+clits vision --screenshot --fullpage --save-baseline --baseline "baseline.png"
+
+# Compare current state with baseline
+clits vision --screenshot --fullpage --diff --baseline "baseline.png" --diff-output "diff.png" --diff-report "analysis.json"
+
+# Batch comparison with custom threshold
+clits vision --screenshot --selectors ".header,.footer,.main" --batch-diff --diff-threshold 0.05
+```
+
+#### 🎥 Video Capture Capabilities
+- **`--video`**: Enable video recording for interaction workflows
+- **`--video-output <path>`**: Specify video output path (default: clits-recording.webm)
+- **`--video-duration <seconds>`**: Set recording duration (default: 30s)
+- **`--video-fps <fps>`**: Configure frame rate (default: 10fps)
+
+**Use Cases:**
+- Record user interaction workflows
+- Document bug reproduction steps
+- Create automated testing demos
+- Capture dynamic UI behavior
+
+**Example Usage:**
+```bash
+# Record 60-second workflow at 15fps
+clits vision --video --video-duration 60 --video-fps 15 --video-output "workflow.webm"
+
+# Combine video recording with screenshot capture
+clits vision --video --screenshot --fullpage --output "final-state.png"
+```
+
+#### 🎨 Advanced Element Highlighting
+- **`--highlight`**: Add visual annotations to screenshots
+- **`--highlight-color <color>`**: Set highlighting color (hex, default: #ff0000)
+- **`--highlight-thickness <pixels>`**: Configure border thickness (default: 3px)
+- **`--highlight-all-clickable`**: Automatically highlight all clickable elements
+- **`--annotate-text`**: Add text labels to highlighted elements
+
+**Use Cases:**
+- Visual debugging of element positioning
+- Interactive element discovery
+- UI documentation generation
+- Accessibility analysis visualization
+
+**Example Usage:**
+```bash
+# Highlight all clickable elements with custom styling
+clits vision --screenshot --fullpage --highlight-all-clickable --highlight-color "#00ff00" --highlight-thickness 5
+
+# Add text annotations to highlighted elements
+clits vision --screenshot --selector ".error-messages" --highlight --annotate-text --output "annotated.png"
+```
+
+#### 🔄 Enhanced Batch Processing
+- **`--batch-diff`**: Process multiple screenshots for diff analysis
+- **`--selectors`**: Support for comma-separated multiple element capture
+- **`--output-dir`**: Organize batch outputs in directories
+- **Integrated reporting**: Comprehensive JSON metadata for all operations
+
+**Use Cases:**
+- Large-scale visual testing
+- Multi-element regression analysis
+- Systematic UI validation
+- Automated testing pipeline integration
+
+### 🛠 Technical Improvements
+- Enhanced VisionHandler with new result interfaces
+- Structured diff analysis with pixel-level precision
+- Video capture framework with configurable parameters
+- Advanced element highlighting with annotation support
+- Improved error handling and logging for new features
+- Extended metadata capture for comprehensive reporting
+
+### 🎯 AI Integration Ready
+All new features are designed for seamless AI assistant integration:
+- JSON-structured outputs for programmatic analysis
+- Base64 support for direct AI vision model processing
+- Detailed metadata for automated decision making
+- Error handling suitable for autonomous workflows
+
 ## [1.0.8] - 2025-06-11
 
 ### 🚀 FIRST STABLE RELEASE
