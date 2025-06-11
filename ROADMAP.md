@@ -5,7 +5,7 @@ This document outlines the development plans and future features for CLiTS (Chro
 ## Current Version
 - **Version**: 1.0.7-beta.3
 - **Status**: Beta - Production Ready for OnDeck Integration
-- **Focus**: Material-UI Support & Documentation Standards
+- **Focus**: Transitioning to Development Methodology Framework
 
 ### Current Release Highlights (v1.0.7-beta.3)
 - ✅ Full Material-UI component pattern support (buttons, dialogs, tabs, switches, action areas)
@@ -15,38 +15,44 @@ This document outlines the development plans and future features for CLiTS (Chro
 
 ## Short-term Goals (Next 2-3 Releases)
 
-### v1.0.8-beta.1 (Planned)
-- [ ] **Material-UI Component Patterns**
-  - [ ] Expand support for new and custom Material-UI components
-  - [ ] Monitor for breaking changes in future Material-UI major versions
-  - [ ] Add support for custom-styled or third-party-wrapped Material-UI elements
+### v1.0.8-beta.1 (Planned) - Registry System Foundation
+- [ ] **Element Registry System**
+  - [ ] Registry JSON format implementation
+  - [ ] Basic CRUD commands (`register`, `update`, `validate`)
+  - [ ] Registry-based targeting system
+  - [ ] Migration tools for existing selectors
 
-- [ ] **Custom Config File Support**
-  - [ ] Implement user-editable config file (.clitsrc or clits.config.json)
-  - [ ] Allow custom selectors and save button patterns
-  - [ ] Enable project-level overrides for unique UI patterns
+- [ ] **Registry Integration**
+  - [ ] Material-UI component auto-registration
+  - [ ] Custom selector pattern support
+  - [ ] Project-level registry configuration
+  - [ ] Registry validation and maintenance tools
 
-### v1.0.8-beta.2 (Planned)
-- [ ] **Sample App & Regression Suite**
-  - [ ] Provide sample Material-UI app for end-to-end testing
-  - [ ] Include CLI-driven test suite for all detection strategies
-  - [ ] Document CI/CD pipeline integration best practices
+### v1.0.8-beta.2 (Planned) - Framework Integration
+- [ ] **React Integration**
+  - [ ] `@clits/react` package development
+  - [ ] `useClitsElement` hook implementation
+  - [ ] Component auto-registration system
+  - [ ] TypeScript definitions generation
 
-- [ ] **Advanced Save/Submit Detection**
-  - [ ] Support complex save/submit workflows
-  - [ ] Action chaining (click save, then confirm in modal)
-  - [ ] Async save operations and progress indicators
+- [ ] **Build Tool Integration**
+  - [ ] Webpack/Vite plugin development
+  - [ ] Auto-discovery during build
+  - [ ] Registry validation on build
+  - [ ] TypeScript type generation
 
-### v1.0.9-beta.1 (Planned)
-- [ ] **Accessibility & Internationalization**
-  - [ ] Improved i18n/translated label detection
-  - [ ] Multi-language ARIA role support
-  - [ ] Documentation for multilingual automation
+### v1.0.9-beta.1 (Planned) - Smart UI Management
+- [ ] **Passive Scanning System**
+  - [ ] Non-interfering element discovery
+  - [ ] Smart UI state management
+  - [ ] Automatic interference handling
+  - [ ] Safe interaction modes
 
-- [ ] **Performance & Usability**
-  - [ ] Optimize selector search for large DOMs
-  - [ ] Add verbose/debug output and dry-run mode
-  - [ ] Enhanced error messages and troubleshooting
+- [ ] **Workflow Management**
+  - [ ] Workflow definition format
+  - [ ] Step-by-step execution engine
+  - [ ] Error recovery and retry logic
+  - [ ] Workflow validation tools
 
 ### v1.0.8-beta.0 (Completed)
   - [x] **visionCLITS - Visual State Capture** ✅ COMPLETED
@@ -70,42 +76,37 @@ This document outlines the development plans and future features for CLiTS (Chro
     - [x] Comprehensive logging and traceability
     - [x] AI-friendly output formats
 
-  - [x] **Documentation & Examples** ✅ COMPLETED
-    - [x] CLI usage examples
-    - [x] AI integration patterns
-    - [x] Visual regression testing guide
-    - [x] Remote debugging workflows
-
 ## Medium-term Goals (Next 3-6 Months)
 
-### v1.1.0 (Planned)
-- [ ] **Stable Release Preparation**
-  - [ ] Complete framework support
-  - [ ] Advanced debugging capabilities
-  - [ ] Performance optimizations
-  - [ ] Comprehensive test coverage
+### v2.0.0-beta.1 (Planned)
+- [ ] **Development Methodology Framework**
+  - [ ] Complete registry system
+  - [ ] Full framework integration
+  - [ ] Development workflow tools
+  - [ ] CI/CD integration
 
-### v1.2.0 (Planned)
-- [ ] **Community & Documentation**
-  - [ ] Expanded real-world examples
-  - [ ] Community contribution guidelines
-  - [ ] Public changelog and roadmap maintenance
-  - [ ] Integration with popular testing frameworks
+### v2.0.0-beta.2 (Planned)
+- [ ] **Advanced Automation Features**
+  - [ ] Visual regression testing
+  - [ ] Performance monitoring
+  - [ ] State management integration
+  - [ ] Cross-browser support
 
 ## Long-term Vision
 
-### v2.0.0 (Future)
-- [ ] **Browser Extension Development**
-  - [ ] Full browser extension support
-  - [ ] Enhanced UI for log visualization
-  - [ ] Advanced automation features
-  - [ ] Cross-browser compatibility
-
+### v2.1.0 (Future)
 - [ ] **Enterprise Features**
-  - [ ] Advanced AI integration
-  - [ ] Team collaboration features
-  - [ ] Enterprise security features
-  - [ ] Advanced reporting and analytics
+  - [ ] Team collaboration tools
+  - [ ] Advanced security features
+  - [ ] Enterprise reporting
+  - [ ] Integration with enterprise tools
+
+### v2.2.0 (Future)
+- [ ] **AI & Machine Learning**
+  - [ ] Automated test generation
+  - [ ] Smart element discovery
+  - [ ] Predictive maintenance
+  - [ ] Anomaly detection
 
 ## Contributing to the Roadmap
 
@@ -144,4 +145,4 @@ We welcome community input on our roadmap. If you have suggestions for features 
 
 ---
 
-*Note: This roadmap is subject to change based on community feedback and development priorities. Last updated: 2025-06-08* 
+*Note: This roadmap is subject to change based on community feedback and development priorities. Last updated: 2025-06-11* 
