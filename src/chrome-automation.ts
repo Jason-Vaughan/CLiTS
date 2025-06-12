@@ -56,6 +56,9 @@ export interface InteractionOptions {
   withMetadata?: boolean;
   annotated?: boolean;
   selectorMap?: boolean;
+  // JavaScript expression support for advanced element selection
+  useJavaScriptExpression?: boolean;
+  jsExpression?: string;
 }
 
 export interface InteractionResult {
@@ -80,7 +83,7 @@ export interface InteractionResult {
 }
 
 export interface AutomationStep {
-  action: 'navigate' | 'wait' | 'click' | 'type' | 'toggle' | 'screenshot';
+  action: 'navigate' | 'wait' | 'click' | 'type' | 'toggle' | 'screenshot' | 'discover_links';
   url?: string;
   selector?: string;
   text?: string;
@@ -245,7 +248,12 @@ export class ChromeAutomation {
 
       // Perform click interaction
       if (options.clickSelector) {
-        await this.clickElement(client, options.clickSelector);
+        if (options.useJavaScriptExpression && options.jsExpression) {
+          // Use JavaScript expression for element selection
+          await this.clickElementByJavaScript(client, options.jsExpression);
+        } else {
+          await this.clickElement(client, options.clickSelector);
+        }
       }
 
       // Perform type interaction
@@ -627,6 +635,25 @@ export class ChromeAutomation {
         result.screenshots!.push(step.path);
         break;
 
+      case 'discover_links': {
+        // Add discover_links action support
+        const links = await this.discoverAllLinks(client);
+        
+        // Save links data to results
+        if (!result.monitoringData) result.monitoringData = [];
+        result.monitoringData.push({
+          type: 'discovered_links',
+          timestamp: new Date().toISOString(),
+          data: links
+        });
+        
+        // If path is specified, save to file
+        if (step.path) {
+          writeFileSync(step.path, JSON.stringify(links, null, 2));
+        }
+        break;
+      }
+
       default:
         throw new Error(`Unknown step action: ${step.action}`);
     }
@@ -794,6 +821,80 @@ export class ChromeAutomation {
     });
 
     logger.info(`Clicked element: ${selector}`);
+  }
+
+  private async clickElementByJavaScript(client: CDPClient, jsExpression: string): Promise<void> {
+    logger.info(`Attempting to click element using JavaScript expression`);
+    
+    // Evaluate the JavaScript expression to find the element and get its coordinates
+    const result = await client.Runtime.evaluate({
+      expression: `
+        (function() {
+          try {
+            const element = ${jsExpression};
+            if (!element) return { error: 'Element not found by JavaScript expression' };
+            
+            const rect = element.getBoundingClientRect();
+            const style = getComputedStyle(element);
+            
+            // Skip if element is completely hidden
+            if (style.display === 'none' || style.visibility === 'hidden') {
+              return { error: 'Element is hidden' };
+            }
+            
+            // Check if element is visible and has dimensions
+            if (rect.width === 0 || rect.height === 0) {
+              return { error: 'Element has no dimensions' };
+            }
+            
+            // Calculate center coordinates
+            const x = rect.left + rect.width / 2;
+            const y = rect.top + rect.height / 2;
+            
+            return {
+              x: Math.max(x, 10),
+              y: Math.max(y, 10),
+              width: rect.width,
+              height: rect.height,
+              tag: element.tagName,
+              text: element.textContent?.trim() || ''
+            };
+          } catch (err) {
+            return { error: err.message };
+          }
+        })()
+      `
+    });
+    
+    if (result.result?.value?.error) {
+      throw new Error(`JavaScript element selection failed: ${result.result.value.error}`);
+    }
+    
+    if (!result.result?.value) {
+      throw new Error('JavaScript element selection returned no result');
+    }
+    
+    const elementInfo = result.result.value;
+    const { x, y } = elementInfo;
+    
+    // Perform click using mouse events
+    await client.Input.dispatchMouseEvent({
+      type: 'mousePressed',
+      x,
+      y,
+      button: 'left',
+      clickCount: 1
+    });
+    
+    await client.Input.dispatchMouseEvent({
+      type: 'mouseReleased',
+      x,
+      y,
+      button: 'left',
+      clickCount: 1
+    });
+
+    logger.info(`Successfully clicked element via JavaScript: ${elementInfo.tag} "${elementInfo.text}" at (${x}, ${y})`);
   }
 
   private async typeInElement(client: CDPClient, selector: string, text: string): Promise<void> {
@@ -1105,55 +1206,43 @@ export class ChromeAutomation {
     };
   }
 
-  // Visual element selection methods
+  // Visual element selection methods - FIXED IMPLEMENTATIONS
   async findElementByText(text: string): Promise<string> {
-    // Return a selector that can be used to find elements containing the text
-    return `*:contains("${text}")`;
+    // Return a JavaScript expression that finds elements by text content
+    // This will be used in the findElementWithFallback method
+    return `Array.from(document.querySelectorAll('button, a, [role="button"], span, div')).find(el => el.textContent && el.textContent.trim().toLowerCase().includes('${text.toLowerCase()}'))`;
   }
 
   async findElementByColor(color: string): Promise<string> {
-    // This is a simplified implementation - in reality, you'd need to analyze computed styles
-    // For now, return a selector that looks for elements with the color in their class name or style
-    return `[style*="${color}"], [class*="${color}"]`;
+    // Return a JavaScript expression that finds elements by computed color
+    return `Array.from(document.querySelectorAll('*')).find(el => {
+      const style = getComputedStyle(el);
+      return style.color === '${color}' || style.backgroundColor === '${color}' || style.borderColor === '${color}';
+    })`;
   }
 
   async findElementByRegion(region: string): Promise<string> {
-    // Convert region to approximate CSS selectors based on viewport positioning
-    const regionMap: { [key: string]: string } = {
-      'top-left': ':first-child',
-      'top-right': ':last-child',
-      'bottom-left': ':nth-last-child(2)',
-      'bottom-right': ':last-child',
-      'center': ':nth-child(n+3):nth-last-child(n+3)'
+    // Return a JavaScript expression that finds elements by viewport region
+    const regionExpressions: { [key: string]: string } = {
+      'top-left': 'document.elementFromPoint(50, 50)',
+      'top-right': 'document.elementFromPoint(window.innerWidth - 50, 50)',
+      'bottom-left': 'document.elementFromPoint(50, window.innerHeight - 50)',
+      'bottom-right': 'document.elementFromPoint(window.innerWidth - 50, window.innerHeight - 50)',
+      'center': 'document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2)'
     };
 
-    return regionMap[region] || region;
+    return regionExpressions[region] || `document.querySelector('body')`;
   }
 
   async findElementByDescription(description: string): Promise<string> {
-    // This is experimental - use text-based matching for now
-    // In a full implementation, this could use AI vision to analyze screenshots
+    // Use text-based matching as a fallback for description-based search
     const keywords = description.toLowerCase().split(' ');
-    const commonMappings: { [key: string]: string } = {
-      'button': 'button',
-      'link': 'a',
-      'input': 'input',
-      'text': 'input[type="text"]',
-      'edit': '[contenteditable], input, textarea',
-      'save': 'button[type="submit"], button:contains("save")',
-      'close': 'button:contains("close"), .close, [aria-label*="close"]',
-      'menu': '[role="menu"], .menu',
-      'dropdown': 'select, [role="combobox"]'
-    };
-
-    for (const keyword of keywords) {
-      if (commonMappings[keyword]) {
-        return commonMappings[keyword];
-      }
-    }
-
-    // Fallback: search by text content
-    return `*:contains("${description}")`;
+    const keywordPattern = keywords.join('|');
+    
+    return `Array.from(document.querySelectorAll('button, a, [role="button"], input, [aria-label]')).find(el => {
+      const text = (el.textContent || el.getAttribute('aria-label') || el.getAttribute('title') || '').toLowerCase();
+      return /${keywordPattern}/.test(text);
+    })`;
   }
 
   // Discover all CSS selectors on the page
@@ -1284,5 +1373,61 @@ export class ChromeAutomation {
     } finally {
       await client.close();
     }
+  }
+
+  // NEW METHOD: Discover all navigation links
+  private async discoverAllLinks(client: CDPClient): Promise<Array<{
+    text: string;
+    url: string;
+    selector: string;
+    isExternal: boolean;
+  }>> {
+    const result = await client.Runtime.evaluate({
+      expression: `
+        JSON.stringify((function() {
+          const links = [];
+          const linkElements = document.querySelectorAll('a[href]');
+          
+          linkElements.forEach((link, index) => {
+            const href = link.getAttribute('href');
+            if (!href) return;
+            
+            const text = link.textContent?.trim() || link.getAttribute('aria-label') || link.getAttribute('title') || '';
+            const isExternal = href.startsWith('http') && !href.includes(window.location.hostname);
+            
+            // Generate a reliable selector
+            let selector = '';
+            if (link.getAttribute('data-testid')) {
+              selector = '[data-testid="' + link.getAttribute('data-testid') + '"]';
+            } else if (link.getAttribute('aria-label')) {
+              selector = '[aria-label="' + link.getAttribute('aria-label') + '"]';
+            } else if (text && text.length > 0 && text.length < 50) {
+              // Use nth-of-type selector for text-based links
+              const allLinksWithSameText = Array.from(document.querySelectorAll('a')).filter(a => 
+                a.textContent?.trim() === text
+              );
+              const indexInGroup = allLinksWithSameText.indexOf(link) + 1;
+              selector = 'a[href="' + href + '"]:nth-of-type(' + indexInGroup + ')';
+            } else {
+              selector = 'a[href="' + href + '"]';
+            }
+            
+            links.push({
+              text: text || 'No text',
+              url: href,
+              selector: selector,
+              isExternal: isExternal
+            });
+          });
+          
+          return links;
+        })())
+      `
+    });
+
+    if (result.result.value) {
+      return JSON.parse(result.result.value);
+    }
+    return [];
   }
 } 

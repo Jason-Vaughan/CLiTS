@@ -5,6 +5,73 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.9-beta.18] - 2025-06-12
+
+### 🚨 CRITICAL BUG FIXES - OnDeck Bug Report Resolution
+
+#### Fixed
+- **🔧 Text-Based Element Selection**: Fixed broken `--click-text` functionality in interact command
+  - **Root Cause**: Invalid `:contains()` pseudo-selector usage (not a valid CSS selector)
+  - **Solution**: Implemented proper JavaScript expression evaluation for text-based element finding
+  - **Impact**: `clits interact --click-text "Save"` now works correctly with Material-UI and React components
+  
+- **🔧 Automation Scripts Missing discover_links**: Added support for `discover_links` action in automation scripts
+  - **Root Cause**: `discover_links` action was not implemented in executeStep method
+  - **Solution**: Added full `discover_links` action support with JSON output and file saving
+  - **Impact**: Automation scripts can now discover and save navigation links as documented
+  
+- **🔧 Chrome Control Timeout Issues**: Added comprehensive timeout handling to chrome-control command
+  - **Root Cause**: Infinite loops and hanging operations without timeout limits
+  - **Solution**: Added timeouts for connections (10s), element analysis (15s), clicks (10s), and session limits (50 iterations)
+  - **Impact**: Chrome control sessions now have proper timeout handling and won't hang indefinitely
+
+- **🔧 Visual Element Selection Methods**: Fixed broken color, region, and description-based clicking
+  - **Root Cause**: Methods returned invalid CSS selectors instead of JavaScript expressions
+  - **Solution**: Implemented proper JavaScript evaluation for all visual selection methods
+  - **Impact**: All `--click-color`, `--click-region`, and `--click-description` options now work correctly
+
+#### Added
+- **🔧 JavaScript Expression Support**: New infrastructure for advanced element selection
+  - Added `useJavaScriptExpression` and `jsExpression` options to InteractionOptions interface
+  - Implemented `clickElementByJavaScript` method for direct JavaScript-based element interaction
+  - Enhanced CLI to properly handle JavaScript expressions vs CSS selectors
+  
+- **⏱️ Session Safety Features**: Comprehensive timeout and loop prevention
+  - Maximum iteration limits (50) to prevent infinite loops in chrome-control
+  - Timeout-based element analysis with user-friendly error messages
+  - Graceful error handling with retry/exit options
+  - Session progress indicators and clear exit paths
+
+#### Enhanced
+- **🎯 Element Detection Reliability**: Improved element finding strategies
+  - Better error messages for element selection failures
+  - Enhanced JavaScript expression evaluation with proper error handling
+  - Improved coordinate calculation and element visibility checks
+  
+- **📖 Automation Script Support**: Extended automation capabilities
+  - Full `discover_links` action implementation with link metadata
+  - Enhanced automation result structure with monitoring data
+  - Better error handling and progress tracking for all automation actions
+
+#### Technical Changes
+- **Updated AutomationStep Interface**: Added `discover_links` to supported actions
+- **Enhanced InteractionOptions**: Added JavaScript expression support properties  
+- **New clickElementByJavaScript Method**: Direct JavaScript evaluation for complex selections
+- **Improved CLI Processing**: Proper handling of visual selection methods with JavaScript expressions
+- **Enhanced chrome-control Loop**: Comprehensive timeout and safety features
+
+#### Validation
+All issues from comprehensive bug report resolved:
+```bash
+✅ clits interact --click-text "Save" --chrome-port 9222           # Text-based clicking works
+✅ clits interact --click-color "#ff0000" --chrome-port 9222       # Color-based clicking works  
+✅ clits interact --click-region "center" --chrome-port 9222       # Region-based clicking works
+✅ clits automate --script script.json --chrome-port 9222          # discover_links action works
+✅ clits chrome-control --chrome-port 9222                         # Proper timeout handling
+```
+
+**OnDeck Integration Status**: ✅ **ALL CRITICAL BUGS RESOLVED** - interact command fully functional with proper timeout handling
+
 ## [1.0.9-beta.1] - 2025-06-11
 
 ### ✨ NEW ROADMAP FEATURES - VisionCLITS Enhancements

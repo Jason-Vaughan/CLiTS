@@ -534,50 +534,74 @@ export async function directChromeControl(port: number = 9222, host: string = 'l
     // Auto-launch Chrome if needed (standalone version for automated commands)
     await launchChromeForAutomation(port);
     
-    // Check Chrome connection
+    // Check Chrome connection with timeout
     const spinner = ora('Connecting to Chrome debugging session...').start();
     
-    const response = await fetch(`http://${host}:${port}/json/list`);
-    const targets = await response.json() as Array<{
-      id: string;
-      type: string;
-      url: string;
-      title: string;
-      webSocketDebuggerUrl?: string;
-    }>;
+    // Add timeout for Chrome connection
+    const connectionTimeout = 10000; // 10 seconds
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), connectionTimeout);
     
-    const pageTargets = targets.filter((t: any) => t.type === 'page');
-    
-    if (pageTargets.length === 0) {
-      spinner.fail('No Chrome page targets found. Please open a tab in Chrome with --remote-debugging-port=9222');
-      return;
-    }
-    
-    spinner.succeed(`Found ${pageTargets.length} Chrome page target(s)`);
-    
-    // Let user select target if multiple
-    let selectedTarget = pageTargets[0];
-    if (pageTargets.length > 1) {
-      const choices = pageTargets.map((t, index) => ({
-        name: `[${index + 1}] ${t.title} - ${t.url}`,
-        value: t
-      }));
+    try {
+      const response = await fetch(`http://${host}:${port}/json/list`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
       
-      const { target } = await inquirer.prompt([
-        {
-          type: 'list',
-          name: 'target',
-          message: 'Select Chrome tab to control:',
-          choices
-        }
-      ]);
-      selectedTarget = target;
+      if (!response.ok) {
+        throw new Error(`Chrome debugging not responding: ${response.status} ${response.statusText}`);
+      }
+      
+      const targets = await response.json() as Array<{
+        id: string;
+        type: string;
+        url: string;
+        title: string;
+        webSocketDebuggerUrl?: string;
+      }>;
+      
+      const pageTargets = targets.filter((t: any) => t.type === 'page');
+      
+      if (pageTargets.length === 0) {
+        spinner.fail('No Chrome page targets found. Please open a tab in Chrome with --remote-debugging-port=9222');
+        return;
+      }
+      
+      spinner.succeed(`Found ${pageTargets.length} Chrome page target(s)`);
+      
+      // Let user select target if multiple
+      let selectedTarget = pageTargets[0];
+      if (pageTargets.length > 1) {
+        const choices = pageTargets.map((t, index) => ({
+          name: `[${index + 1}] ${t.title} - ${t.url}`,
+          value: t
+        }));
+        
+        const { target } = await inquirer.prompt([
+          {
+            type: 'list',
+            name: 'target',
+            message: 'Select Chrome tab to control:',
+            choices
+          }
+        ]);
+        selectedTarget = target;
+      }
+      
+      console.log(chalk.cyan(`Selected: ${selectedTarget.title} - ${selectedTarget.url}`));
+      
+      // Start the direct Chrome control loop with timeout handling
+      await directChromeControlLoop(selectedTarget, port, host);
+      
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+        spinner.fail(`Chrome connection timeout after ${connectionTimeout / 1000}s. Please ensure Chrome is running with --remote-debugging-port=${port}`);
+      } else {
+        spinner.fail(`Failed to connect to Chrome: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`);
+      }
+      throw fetchError;
     }
-    
-    console.log(chalk.cyan(`Selected: ${selectedTarget.title} - ${selectedTarget.url}`));
-    
-    // Start the direct Chrome control loop
-    await directChromeControlLoop(selectedTarget, port, host);
     
   } catch (error) {
     console.error(chalk.red(`Failed to connect to Chrome: ${error instanceof Error ? error.message : String(error)}`));
@@ -587,12 +611,53 @@ export async function directChromeControl(port: number = 9222, host: string = 'l
 
 async function directChromeControlLoop(target: any, port: number, host: string): Promise<void> {
   let controlRunning = true;
+  const maxIterations = 50; // Prevent infinite loops
+  let iterationCount = 0;
   
-  while (controlRunning) {
+  console.log(chalk.gray('Chrome Control Session Started - Press Ctrl+C to exit anytime\n'));
+  
+  while (controlRunning && iterationCount < maxIterations) {
+    iterationCount++;
+    
     try {
-      // Build element hierarchy using direct CDP
+      // Add timeout for element analysis
+      const analysisTimeout = 15000; // 15 seconds
+      let allElements: Array<{ name: string; url: string }> = [];
+      
       const spinner = ora('Analyzing page elements...').start();
-      const allElements = await buildElementHierarchyDirect(target.id, port, host);
+      
+      try {
+        // Wrap element discovery in a timeout
+        const elementPromise = buildElementHierarchyDirect(target.id, port, host);
+        const timeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('Element analysis timeout')), analysisTimeout)
+        );
+        
+        allElements = await Promise.race([elementPromise, timeoutPromise]);
+        
+      } catch (error) {
+        if (error instanceof Error && error.message === 'Element analysis timeout') {
+          spinner.fail(`Element analysis timeout after ${analysisTimeout / 1000}s`);
+          const { action } = await inquirer.prompt([
+            {
+              type: 'list',
+              name: 'action',
+              message: 'What would you like to do?',
+              choices: [
+                { name: '🔄 Try again', value: 'retry' },
+                { name: '❌ Exit', value: 'exit' }
+              ]
+            }
+          ]);
+          
+          if (action === 'exit') {
+            controlRunning = false;
+            return;
+          }
+          continue;
+        }
+        throw error;
+      }
       
       if (allElements.length === 0) {
         spinner.fail('No clickable elements found on this page');
@@ -617,7 +682,7 @@ async function directChromeControlLoop(target: any, port: number, host: string):
       
       spinner.succeed(`Found ${allElements.length} clickable elements`);
       
-      // Show elements for selection
+      // Show elements for selection with timeout
       const choices = [
         ...allElements.map(element => ({
           name: `${element.name.slice(0, 80)}${element.name.length > 80 ? '...' : ''} ${chalk.gray(`${element.url.slice(0, 40)}${element.url.length > 40 ? '...' : ''}`)}`,
@@ -632,7 +697,7 @@ async function directChromeControlLoop(target: any, port: number, host: string):
         {
           type: 'list',
           name: 'selectedUrl',
-          message: `Select element to click (${allElements.length} found):`,
+          message: `Select element to click (${allElements.length} found) - Session ${iterationCount}/${maxIterations}:`,
           choices,
           pageSize: 15
         }
@@ -647,24 +712,56 @@ async function directChromeControlLoop(target: any, port: number, host: string):
         continue;
       }
       
-      // Click the selected element
+      // Click the selected element with timeout
+      const clickTimeout = 10000; // 10 seconds
       const clickSpinner = ora(`Clicking: ${selectedUrl}`).start();
+      
       try {
-        await clickElementDirect(target.id, selectedUrl, port, host);
+        const clickPromise = clickElementDirect(target.id, selectedUrl, port, host);
+        const clickTimeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('Click operation timeout')), clickTimeout)
+        );
+        
+        await Promise.race([clickPromise, clickTimeoutPromise]);
         clickSpinner.succeed(`✅ Successfully clicked: ${selectedUrl}`);
         
         // Wait a moment for page changes
         await new Promise(resolve => setTimeout(resolve, 1000));
         
       } catch (error) {
-        clickSpinner.fail(`❌ Failed to click: ${selectedUrl}`);
-        console.log(chalk.yellow(`Error: ${error instanceof Error ? error.message : String(error)}`));
+        if (error instanceof Error && error.message === 'Click operation timeout') {
+          clickSpinner.fail(`❌ Click timeout after ${clickTimeout / 1000}s: ${selectedUrl}`);
+        } else {
+          clickSpinner.fail(`❌ Failed to click: ${selectedUrl}`);
+          console.log(chalk.yellow(`Error: ${error instanceof Error ? error.message : String(error)}`));
+        }
       }
       
     } catch (error) {
       console.error(chalk.red(`Control loop error: ${error instanceof Error ? error.message : String(error)}`));
-      controlRunning = false;
+      
+      // Ask user if they want to continue after errors
+      const { action } = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'action',
+          message: 'An error occurred. What would you like to do?',
+          choices: [
+            { name: '🔄 Try again', value: 'retry' },
+            { name: '❌ Exit', value: 'exit' }
+          ]
+        }
+      ]);
+      
+      if (action === 'exit') {
+        controlRunning = false;
+      }
     }
+  }
+  
+  if (iterationCount >= maxIterations) {
+    console.log(chalk.yellow(`\n⚠️  Chrome Control session ended: Maximum iterations (${maxIterations}) reached to prevent infinite loops.`));
+    console.log(chalk.gray('This helps prevent runaway automation processes. Start a new session if needed.'));
   }
 }
 
