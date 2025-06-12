@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "logo": "https://raw.githubusercontent.com/Jason-Vaughan/CLiTS/main/assets/logo.png",
+  "logo": "https://github.com/Jason-Vaughan/CLiTS/blob/main/assets/logo.png?raw=true",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Jason-Vaughan/CLiTS.git"
