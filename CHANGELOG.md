@@ -432,6 +432,59 @@ All new features verified working:
 ✅ clits interact --chrome-port 9222 --wait-for "[role='button']"  # Role-based detection
 ```
 
+## [1.0.9-beta.16] - 2025-06-12
+
+### 🚨 CRITICAL BUG FIXES
+
+#### Fixed
+- **🔧 interact --click Command Complete Failure**: Fixed critical issue where `clits interact --click` was failing after 200+ retry attempts
+  - **Root Cause**: Overly complex element detection strategies causing infinite loops and JSON parsing errors
+  - **Solution**: Simplified `findElementWithFallback` method with limited strategies and better error handling
+  - **Impact**: Click interactions now work reliably with proper error messages instead of endless retries
+  
+- **🔧 chrome-control CLI Argument Parsing**: Fixed `clits chrome-control --chrome-port 9222` showing "unknown option"
+  - **Root Cause**: Documentation showed `--chrome-port` but command only accepted `--port`
+  - **Solution**: Added `--chrome-port` as an alias to `--port` with proper option handling
+  - **Impact**: Both `--port` and `--chrome-port` now work as documented
+  
+- **🔧 waitForSelector Infinite Loops**: Fixed selector waiting logic that could retry indefinitely
+  - **Root Cause**: No maximum attempt limits and poor error propagation
+  - **Solution**: Added attempt limits, better error detection, and longer delays between retries
+  - **Impact**: Failures now happen quickly with specific error messages instead of timeouts
+
+#### Added
+- **📖 Complete Automation Script Documentation**: Added comprehensive documentation for JSON automation scripts
+  - **Location**: `docs/AUTOMATION_SCRIPT_FORMAT.md`
+  - **Content**: Full schema, examples, common mistakes, and best practices
+  - **Impact**: Addresses user confusion about script format with detailed guidance
+
+#### Enhanced
+- **🎯 Element Detection Logic**: Improved reliability and performance
+  - Reduced strategy count from 20+ to 5 focused strategies
+  - Better error messages with specific failure reasons
+  - Faster failure detection instead of exhaustive retries
+  
+- **⏱️ Timeout Management**: More intelligent retry logic
+  - Maximum attempt limits based on timeout duration
+  - Immediate failure for definitive "not found" errors
+  - Better progress logging for debugging
+
+#### Validation
+All priority issues from OnDeck bug report addressed:
+```bash
+✅ clits interact --click "a[href=\"...\"]" --chrome-port 9222    # Now works reliably
+✅ clits chrome-control --chrome-port 9222                       # Both --port and --chrome-port work
+✅ Automation script format fully documented                     # Complete schema available
+```
+
+#### Technical Changes
+- **Simplified findElementWithFallback()**: Reduced complexity and improved reliability
+- **Enhanced CLI Argument Handling**: Added chrome-port aliases throughout
+- **Improved Error Propagation**: Better error context and faster failure detection
+- **Comprehensive Documentation**: Added automation script format guide
+
+**OnDeck Integration Status**: ✅ **CRITICAL ISSUES RESOLVED** - interact --click command now fully functional
+
 [1.0.0]: https://github.com/jasonvaughan/clits/releases/tag/v1.0.0
 [0.3.0]: https://github.com/jasonvaughan/clits/releases/tag/v0.3.0
 [0.2.0]: https://github.com/jasonvaughan/clits/releases/tag/v0.2.0

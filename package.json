@@ -1,6 +1,6 @@
 {
   "name": "@puberty-labs/clits",
-  "version": "1.0.9-beta.15",
+  "version": "1.0.9-beta.16",
   "description": "CLiTS (Chrome Logging and Inspection Tool Suite) is a powerful Node.js library for automated Chrome browser testing, logging, and inspection. It provides a comprehensive suite of tools for monitoring network requests, console logs, DOM mutations, and more.",
   "type": "module",
   "main": "dist/index.js",

@@ -385,6 +385,8 @@ Run automation scripts from JSON files.
 }
 ```
 
+📖 **Complete Documentation**: See [Automation Script Format Guide](docs/AUTOMATION_SCRIPT_FORMAT.md) for full schema, examples, and best practices.
+
 **Example:**
 ```sh
 # Basic automation with improved selector reliability
