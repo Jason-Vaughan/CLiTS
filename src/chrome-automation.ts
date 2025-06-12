@@ -660,8 +660,8 @@ export class ChromeAutomation {
   }
 
   private escapeSelector(selector: string): string {
-    // Escape single quotes and backslashes for safe JavaScript string interpolation
-    return selector.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    // Escape backslashes, single quotes, and double quotes for safe JavaScript string interpolation
+    return selector.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
   }
 
   private async findElementWithFallback(client: CDPClient, selector: string): Promise<{ x: number; y: number } | null> {
@@ -823,78 +823,71 @@ export class ChromeAutomation {
     logger.info(`Clicked element: ${selector}`);
   }
 
-  private async clickElementByJavaScript(client: CDPClient, jsExpression: string): Promise<void> {
+  private async clickElementByJavaScript(client: CDPClient, jsExpression: string): Promise<void> { // eslint-disable-line @typescript-eslint/no-unused-vars
     logger.info(`Attempting to click element using JavaScript expression`);
     
-    // Evaluate the JavaScript expression to find the element and get its coordinates
-    const result = await client.Runtime.evaluate({
-      expression: `
-        (function() {
-          try {
-            const element = ${jsExpression};
-            if (!element) return { error: 'Element not found by JavaScript expression' };
-            
-            const rect = element.getBoundingClientRect();
-            const style = getComputedStyle(element);
-            
-            // Skip if element is completely hidden
-            if (style.display === 'none' || style.visibility === 'hidden') {
-              return { error: 'Element is hidden' };
-            }
-            
-            // Check if element is visible and has dimensions
-            if (rect.width === 0 || rect.height === 0) {
-              return { error: 'Element has no dimensions' };
-            }
-            
-            // Calculate center coordinates
-            const x = rect.left + rect.width / 2;
-            const y = rect.top + rect.height / 2;
-            
-            return {
-              x: Math.max(x, 10),
-              y: Math.max(y, 10),
-              width: rect.width,
-              height: rect.height,
-              tag: element.tagName,
-              text: element.textContent?.trim() || ''
-            };
-          } catch (err) {
-            return { error: err.message };
-          }
-        })()
-      `
-    });
-    
-    if (result.result?.value?.error) {
-      throw new Error(`JavaScript element selection failed: ${result.result.value.error}`);
+    try {
+      // Evaluate the provided JavaScript expression directly
+      const result = await client.Runtime.evaluate({
+        expression: jsExpression
+      });
+      
+      if (!result.result?.value) {
+        throw new Error('No result from element evaluation');
+      }
+      
+      // Parse JSON result if the expression returns JSON
+      let resultData = result.result.value;
+      if (typeof resultData === 'string') {
+        try {
+          resultData = JSON.parse(resultData);
+        } catch (e) {
+          // If it's not JSON, treat it as a simple value
+          logger.error('Failed to parse result as JSON:', resultData);
+          throw new Error('Invalid result format from JavaScript expression');
+        }
+      }
+      
+      if (resultData.error) {
+        throw new Error(`Element operation failed: ${resultData.error}`);
+      }
+      
+      if (resultData.success) {
+        logger.info(`Successfully performed ${resultData.method} operation: "${resultData.text}"`);
+        if (resultData.url) {
+          logger.info(`Navigated to: ${resultData.url}`);
+        }
+        
+        // Handle coordinate-based clicking if needed
+        if (resultData.method === 'coordinates' && resultData.x && resultData.y) {
+          await client.Input.dispatchMouseEvent({
+            type: 'mousePressed',
+            x: resultData.x,
+            y: resultData.y,
+            button: 'left',
+            clickCount: 1
+          });
+          
+          await client.Input.dispatchMouseEvent({
+            type: 'mouseReleased',
+            x: resultData.x,
+            y: resultData.y,
+            button: 'left',
+            clickCount: 1
+          });
+          
+          logger.info(`Performed coordinate click at (${resultData.x}, ${resultData.y})`);
+        }
+        
+        return;
+      }
+      
+      throw new Error('Unexpected result from element operation');
+      
+    } catch (error) {
+      logger.error('Click operation failed:', error);
+      throw error;
     }
-    
-    if (!result.result?.value) {
-      throw new Error('JavaScript element selection returned no result');
-    }
-    
-    const elementInfo = result.result.value;
-    const { x, y } = elementInfo;
-    
-    // Perform click using mouse events
-    await client.Input.dispatchMouseEvent({
-      type: 'mousePressed',
-      x,
-      y,
-      button: 'left',
-      clickCount: 1
-    });
-    
-    await client.Input.dispatchMouseEvent({
-      type: 'mouseReleased',
-      x,
-      y,
-      button: 'left',
-      clickCount: 1
-    });
-
-    logger.info(`Successfully clicked element via JavaScript: ${elementInfo.tag} "${elementInfo.text}" at (${x}, ${y})`);
   }
 
   private async typeInElement(client: CDPClient, selector: string, text: string): Promise<void> {
@@ -956,7 +949,7 @@ export class ChromeAutomation {
             label: tab.textContent?.trim() || tab.getAttribute('aria-label') || tab.getAttribute('title') || '',
             selector: tab.getAttribute('data-testid') || 
                      (tab.getAttribute('aria-label') ? '[aria-label="' + tab.getAttribute('aria-label') + '"]' : '') ||
-                     (tab.textContent?.trim() ? ':contains("' + tab.textContent.trim() + '")' : '') ||
+                     (tab.textContent?.trim() ? '[role="tab"]:nth-child(' + (index + 1) + ')' : '') ||
                      '.MuiTab-root:nth-child(' + (index + 1) + ')',
             index: index,
             isActive: tab.getAttribute('aria-selected') === 'true' || tab.classList.contains('Mui-selected'),
@@ -1208,41 +1201,261 @@ export class ChromeAutomation {
 
   // Visual element selection methods - FIXED IMPLEMENTATIONS
   async findElementByText(text: string): Promise<string> {
-    // Return a JavaScript expression that finds elements by text content
-    // This will be used in the findElementWithFallback method
-    return `Array.from(document.querySelectorAll('button, a, [role="button"], span, div')).find(el => el.textContent && el.textContent.trim().toLowerCase().includes('${text.toLowerCase()}'))`;
+    // Return JavaScript expression using the proven working method from chrome-control
+    return `JSON.stringify((() => {
+      const searchText = '${text}';
+      let element = null;
+      
+      // Strategy: Text search in clickable elements (proven to work)
+      const clickables = Array.from(document.querySelectorAll('a, button, [role="button"], [onclick]'));
+      element = clickables.find(el => el.textContent && el.textContent.includes(searchText));
+      
+      if (!element) {
+        return { error: 'Element not found' };
+      }
+      
+      const rect = element.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) {
+        return { error: 'Element not visible' };
+      }
+      
+      // For links, navigate directly (this is the key difference!)
+      if (element.tagName.toLowerCase() === 'a' && element.href) {
+        window.location.href = element.href;
+        return { 
+          success: true, 
+          method: 'navigation', 
+          url: element.href,
+          text: element.textContent?.trim() || ''
+        };
+      }
+      
+      // For other elements, try direct click
+      try {
+        element.click();
+        return { 
+          success: true, 
+          method: 'click',
+          text: element.textContent?.trim() || ''
+        };
+      } catch (e) {
+        return { 
+          success: true, 
+          method: 'coordinates',
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2,
+          text: element.textContent?.trim() || ''
+        };
+      }
+    })())`;
   }
 
   async findElementByColor(color: string): Promise<string> {
-    // Return a JavaScript expression that finds elements by computed color
-    return `Array.from(document.querySelectorAll('*')).find(el => {
-      const style = getComputedStyle(el);
-      return style.color === '${color}' || style.backgroundColor === '${color}' || style.borderColor === '${color}';
-    })`;
+    // Return JavaScript expression using the proven working approach for color-based selection
+    return `JSON.stringify((() => {
+      const targetColor = '${color}';
+      let element = null;
+      
+      // Strategy: Find clickable elements with matching colors
+      const clickables = Array.from(document.querySelectorAll('a, button, [role="button"], [onclick]'));
+      
+      for (const el of clickables) {
+        const style = getComputedStyle(el);
+        const rect = el.getBoundingClientRect();
+        
+        // Only check visible elements
+        if (rect.width > 0 && rect.height > 0) {
+          if (style.color === targetColor || 
+              style.backgroundColor === targetColor || 
+              style.borderColor === targetColor ||
+              style.fill === targetColor) {
+            element = el;
+            break;
+          }
+        }
+      }
+      
+      if (!element) {
+        return { error: 'Element with specified color not found' };
+      }
+      
+      const rect = element.getBoundingClientRect();
+      
+      // For links, navigate directly
+      if (element.tagName.toLowerCase() === 'a' && element.href) {
+        window.location.href = element.href;
+        return { 
+          success: true, 
+          method: 'navigation', 
+          url: element.href,
+          text: element.textContent?.trim() || ''
+        };
+      }
+      
+      // For other elements, try direct click
+      try {
+        element.click();
+        return { 
+          success: true, 
+          method: 'click',
+          text: element.textContent?.trim() || ''
+        };
+      } catch (e) {
+        return { 
+          success: true, 
+          method: 'coordinates',
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2,
+          text: element.textContent?.trim() || ''
+        };
+      }
+    })())`;
   }
 
   async findElementByRegion(region: string): Promise<string> {
-    // Return a JavaScript expression that finds elements by viewport region
-    const regionExpressions: { [key: string]: string } = {
-      'top-left': 'document.elementFromPoint(50, 50)',
-      'top-right': 'document.elementFromPoint(window.innerWidth - 50, 50)',
-      'bottom-left': 'document.elementFromPoint(50, window.innerHeight - 50)',
-      'bottom-right': 'document.elementFromPoint(window.innerWidth - 50, window.innerHeight - 50)',
-      'center': 'document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2)'
-    };
-
-    return regionExpressions[region] || `document.querySelector('body')`;
+    // Return JavaScript expression using the proven working approach for region-based selection
+    return `JSON.stringify((() => {
+      const regions = {
+        'top-left': { x: 50, y: 50 },
+        'top-right': { x: window.innerWidth - 50, y: 50 },
+        'bottom-left': { x: 50, y: window.innerHeight - 50 },
+        'bottom-right': { x: window.innerWidth - 50, y: window.innerHeight - 50 },
+        'center': { x: window.innerWidth / 2, y: window.innerHeight / 2 }
+      };
+      
+      const coords = regions['${region}'];
+      if (!coords) {
+        return { error: 'Invalid region specified' };
+      }
+      
+      // Find the topmost clickable element at this position
+      let element = document.elementFromPoint(coords.x, coords.y);
+      
+      // If the element isn't clickable, look for a clickable parent or child
+      while (element && element !== document.body) {
+        if (element.tagName === 'A' || element.tagName === 'BUTTON' || 
+            element.getAttribute('role') === 'button' || 
+            element.hasAttribute('onclick') ||
+            getComputedStyle(element).cursor === 'pointer') {
+          break;
+        }
+        element = element.parentElement;
+      }
+      
+      if (!element || element === document.body) {
+        element = document.elementFromPoint(coords.x, coords.y);
+      }
+      
+      if (!element) {
+        return { error: 'No element found in specified region' };
+      }
+      
+      const rect = element.getBoundingClientRect();
+      
+      // For links, navigate directly
+      if (element.tagName.toLowerCase() === 'a' && element.href) {
+        window.location.href = element.href;
+        return { 
+          success: true, 
+          method: 'navigation', 
+          url: element.href,
+          text: element.textContent?.trim() || ''
+        };
+      }
+      
+      // For other elements, try direct click
+      try {
+        element.click();
+        return { 
+          success: true, 
+          method: 'click',
+          text: element.textContent?.trim() || ''
+        };
+      } catch (e) {
+        return { 
+          success: true, 
+          method: 'coordinates',
+          x: coords.x,
+          y: coords.y,
+          text: element.textContent?.trim() || ''
+        };
+      }
+    })())`;
   }
 
   async findElementByDescription(description: string): Promise<string> {
-    // Use text-based matching as a fallback for description-based search
-    const keywords = description.toLowerCase().split(' ');
-    const keywordPattern = keywords.join('|');
-    
-    return `Array.from(document.querySelectorAll('button, a, [role="button"], input, [aria-label]')).find(el => {
-      const text = (el.textContent || el.getAttribute('aria-label') || el.getAttribute('title') || '').toLowerCase();
-      return /${keywordPattern}/.test(text);
-    })`;
+    // Return JavaScript expression using the proven working approach for description-based search
+    return `JSON.stringify((() => {
+      const desc = '${description.toLowerCase()}';
+      const keywords = desc.split(' ').filter(w => w.length > 2);
+      let element = null;
+      
+      // Strategy 1: Look for elements with matching aria-label or title
+      const clickables = Array.from(document.querySelectorAll('a, button, [role="button"], [onclick]'));
+      
+      element = clickables.find(el => {
+        const ariaLabel = (el.getAttribute('aria-label') || '').toLowerCase();
+        const title = (el.getAttribute('title') || '').toLowerCase();
+        return ariaLabel.includes(desc) || title.includes(desc) ||
+               keywords.some(keyword => ariaLabel.includes(keyword) || title.includes(keyword));
+      });
+      
+      // Strategy 2: Look for elements with matching text content
+      if (!element) {
+        element = clickables.find(el => {
+          const text = (el.textContent || '').toLowerCase();
+          return text.includes(desc) || keywords.some(keyword => text.includes(keyword));
+        });
+      }
+      
+      // Strategy 3: Look for elements with matching data attributes
+      if (!element) {
+        element = clickables.find(el => {
+          const testId = (el.getAttribute('data-testid') || '').toLowerCase();
+          const dataLabel = (el.getAttribute('data-label') || '').toLowerCase();
+          return testId.includes(desc.replace(/\\s+/g, '-')) || dataLabel.includes(desc) ||
+                 keywords.some(keyword => testId.includes(keyword) || dataLabel.includes(keyword));
+        });
+      }
+      
+      if (!element) {
+        return { error: 'Element matching description not found' };
+      }
+      
+      const rect = element.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) {
+        return { error: 'Element not visible' };
+      }
+      
+      // For links, navigate directly
+      if (element.tagName.toLowerCase() === 'a' && element.href) {
+        window.location.href = element.href;
+        return { 
+          success: true, 
+          method: 'navigation', 
+          url: element.href,
+          text: element.textContent?.trim() || ''
+        };
+      }
+      
+      // For other elements, try direct click
+      try {
+        element.click();
+        return { 
+          success: true, 
+          method: 'click',
+          text: element.textContent?.trim() || ''
+        };
+      } catch (e) {
+        return { 
+          success: true, 
+          method: 'coordinates',
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2,
+          text: element.textContent?.trim() || ''
+        };
+      }
+    })())`;
   }
 
   // Discover all CSS selectors on the page

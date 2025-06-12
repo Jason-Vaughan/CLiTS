@@ -1,0 +1,14 @@
+# Exclude everything except code, docs, script samples, and logo
+CLITS_next_session_priming.md
+*.log
+.DS_Store
+node_modules/
+dist/
+# Allow logo
+!assets/logo.png
+# Exclude all other PNGs except logo
+assets/*.png
+!assets/logo.png
+# Exclude local session, audit, and temp files
+*.audit.json
+*.tmp 
