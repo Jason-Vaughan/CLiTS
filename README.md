@@ -113,9 +113,9 @@ npm install -g clits
 
 ## Quick Start
 
-### 🎉 OnDeck Integration Ready (v1.0.7-beta.3)
+### 🎉 Latest Features (v1.0.9-beta.21)
 
-**Production Status**: ✅ **ALL AUTOMATION BLOCKERS RESOLVED** - Ready for immediate OnDeck integration
+**Production Status**: ✅ **ALL AUTOMATION FEATURES RESOLVED** - Ready for production use
 
 **Validated Commands (100% Working):**
 ```bash
@@ -127,7 +127,7 @@ npm install -g clits
 ✅ clits interact --chrome-port 9222 --wait-for ".MuiButton-root"  # Material-UI detection
 ```
 
-**Latest Enhancements (v1.0.7-beta.3):**
+**Latest Enhancements (v1.0.9-beta.21):**
 - ✅ **Material-UI Support**: Comprehensive selector patterns for Material-UI components
 - ✅ **Save Button Detection**: Intelligent strategies for reliable save button identification
 - ✅ **Tab Discovery**: New command for discovering and interacting with tabs
@@ -627,36 +627,6 @@ The inspector outputs information in a structured format for easy AI parsing:
 ---
 
 ## Examples
-
-### OnDeck Priority Features (v1.0.8-beta.1)
-
-```bash
-# 🔥 CRITICAL: Base64 screenshot output for AI processing
-clits interact --screenshot --base64     # Output base64 to stdout for AI
-clits interact --screenshot --stdout     # JSON output with screenshot data
-
-# 🎯 Visual element selection (HIGH priority)
-clits interact --click-text "Save"               # Click element containing "Save"
-clits interact --click-text "Submit"             # Click element containing "Submit"
-clits interact --click-color "#ff0000"           # Click by color
-clits interact --click-region "top-left"         # Click by screen region
-clits interact --click-description "edit button" # Click by visual description
-
-# 📸 Enhanced screenshot features (MEDIUM priority)
-clits interact --screenshot --with-metadata    # Include element positions/text
-clits interact --screenshot --annotated        # Draw boxes around clickable elements
-clits interact --screenshot --selector-map     # Output clickable element map
-clits interact --screenshot --fullpage --base64  # Full-page base64 output
-
-# 🔍 Selector discovery tools (HIGH priority)
-clits inspect --find-selectors                 # List all available CSS selectors
-clits inspect --find-clickable                 # List clickable elements with coordinates
-clits inspect --element-map                    # Visual map of page elements
-clits inspect --output-format json             # JSON output for AI processing
-
-# 💡 Combined AI automation workflow
-clits interact --click-text "Edit" --screenshot --base64 --selector-map --stdout
-```
 
 ### Standard Usage Examples
 

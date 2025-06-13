@@ -1,0 +1,32 @@
+{
+  "steps": [
+    {
+      "action": "navigate",
+      "url": "http://localhost:5173",
+      "timeout": 10000
+    },
+    {
+      "action": "screenshot",
+      "path": "beta21-start.png"
+    },
+    {
+      "action": "interact",
+      "clickText": "Zone Mapper",
+      "screenshotPath": "beta21-text-click.png"
+    },
+    {
+      "action": "interact",
+      "selector": "button:nth-of-type(1)",
+      "screenshotPath": "beta21-css-selector.png"
+    },
+    {
+      "action": "interact",
+      "clickRegion": "center",
+      "screenshotPath": "beta21-region-click.png"
+    }
+  ],
+  "options": {
+    "timeout": 30000,
+    "monitor": true
+  }
+} 

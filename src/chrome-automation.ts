@@ -83,12 +83,18 @@ export interface InteractionResult {
 }
 
 export interface AutomationStep {
-  action: 'navigate' | 'wait' | 'click' | 'type' | 'toggle' | 'screenshot' | 'discover_links';
+  action: 'navigate' | 'wait' | 'click' | 'type' | 'toggle' | 'screenshot' | 'discover_links' | 'interact';
   url?: string;
   selector?: string;
   text?: string;
   path?: string;
   timeout?: number;
+  // New interact action properties
+  clickText?: string;
+  clickColor?: string;
+  clickRegion?: string;
+  clickDescription?: string;
+  screenshotPath?: string;
 }
 
 export interface AutomationScript {
@@ -654,6 +660,64 @@ export class ChromeAutomation {
         break;
       }
 
+      case 'interact': {
+        // Add interact action support - handle visual selection methods like CLI does
+        let clickSelector = step.selector;
+        let useJavaScriptExpression = false;
+        let jsExpression = '';
+        
+        if (step.clickText) {
+          jsExpression = await this.findElementByText(step.clickText);
+          useJavaScriptExpression = true;
+          clickSelector = '__JS_EXPRESSION__';
+        } else if (step.clickColor) {
+          jsExpression = await this.findElementByColor(step.clickColor);
+          useJavaScriptExpression = true;
+          clickSelector = '__JS_EXPRESSION__';
+        } else if (step.clickRegion) {
+          jsExpression = await this.findElementByRegion(step.clickRegion);
+          useJavaScriptExpression = true;
+          clickSelector = '__JS_EXPRESSION__';
+        } else if (step.clickDescription) {
+          jsExpression = await this.findElementByDescription(step.clickDescription);
+          useJavaScriptExpression = true;
+          clickSelector = '__JS_EXPRESSION__';
+        }
+        
+        const interactionOptions: InteractionOptions = {
+          clickSelector,
+          screenshotPath: step.screenshotPath,
+          takeScreenshot: !!step.screenshotPath,
+          timeout: step.timeout,
+          chromePort: this.port,
+          chromeHost: this.host,
+          useJavaScriptExpression,
+          jsExpression
+        };
+        
+        const interactResult = await this.interact(interactionOptions);
+        
+        // Add screenshot to results if taken
+        if (interactResult.screenshotPath) {
+          result.screenshots!.push(interactResult.screenshotPath);
+        }
+        
+        // Add network logs if captured
+        if (interactResult.networkLogs) {
+          if (!result.monitoringData) result.monitoringData = [];
+          result.monitoringData.push({
+            type: 'network_logs',
+            timestamp: new Date().toISOString(),
+            data: interactResult.networkLogs
+          });
+        }
+        
+        if (!interactResult.success) {
+          throw new Error(interactResult.error || 'Interaction failed');
+        }
+        break;
+      }
+
       default:
         throw new Error(`Unknown step action: ${step.action}`);
     }
@@ -665,102 +729,77 @@ export class ChromeAutomation {
   }
 
   private async findElementWithFallback(client: CDPClient, selector: string): Promise<{ x: number; y: number } | null> {
-    const escapedSelector = this.escapeSelector(selector);
+    logger.debug(`Finding element with selector: ${selector}`);
     
-    // Basic elements that always exist and should be found without strict visibility checks
-    const basicElements = ['body', 'html', 'head', 'document'];
-    
-    // Common React/HTML elements that should also get relaxed visibility handling
-    const commonElements = ['button', 'input', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'div', 'span', 'a', 'form', 'textarea', 'select'];
-    
-    const isBasicElement = basicElements.includes(selector.toLowerCase());
-    const isCommonElement = commonElements.includes(selector.toLowerCase()) || 
-                           selector.includes('button') || 
-                           selector.includes('input') || 
-                           selector.includes('checkbox');
-    
-    logger.debug(`Finding element with selector: ${selector}, isBasicElement: ${isBasicElement}, isCommonElement: ${isCommonElement}`);
-    
-    // CRITICAL FIX: Simplified strategies to reduce failures and improve reliability
-    const strategies = [
-      // 1. Direct CSS selector (most reliable)
-      `document.querySelector('${escapedSelector}')`,
-      
-      // 2. Attribute-based search (highly reliable)
-      `document.querySelector('[data-testid="${escapedSelector.replace(/['"]/g, '')}"]')`,
-      `document.querySelector('[aria-label*="${escapedSelector.replace(/['"]/g, '')}"]')`,
-      
-      // 3. Text content search (for clickable elements)
-      `Array.from(document.querySelectorAll('button, a, [role="button"]')).find(el => el.textContent && el.textContent.trim().toLowerCase().includes('${escapedSelector.replace(/['"]/g, '').toLowerCase()}'))`,
-      
-      // 4. Material-UI patterns (only if selector suggests it)
-      ...(selector.includes('Mui') || selector.includes('mui') ? [
-        `document.querySelector('.MuiButton-root${escapedSelector.startsWith('.') ? escapedSelector : ''}')`,
-        `document.querySelector('.MuiIconButton-root${escapedSelector.startsWith('.') ? escapedSelector : ''}')`,
-      ] : []),
-      
-      // 5. Class-based search (fallback)
-      `document.querySelector('[class*="${escapedSelector.replace(/['"]/g, '')}"]')`
-    ];
-
-    // CRITICAL FIX: Limit retry attempts to prevent infinite loops
-    for (let i = 0; i < Math.min(strategies.length, 5); i++) {
-      const strategy = strategies[i];
-      try {
-        // CRITICAL FIX: Simplified and more robust element detection
-        const result = await client.Runtime.evaluate({
-          expression: `
-            (function() {
+    // CRITICAL FIX: Use the same approach as the working clickElementDirect method
+    const result = await client.Runtime.evaluate({
+      expression: `
+        JSON.stringify((() => {
+          const selector = '${selector.replace(/'/g, "\\'")}';
+          let element = null;
+          
+          // Strategy 1: Direct CSS selector (this is what was failing before)
+          try {
+            element = document.querySelector(selector);
+          } catch (e) {
+            // Invalid CSS selector, skip
+          }
+          
+          // Strategy 2: Attribute-based search for common patterns
+          if (!element && !selector.includes(':')) {
+            const patterns = [
+              '[data-testid="' + selector + '"]',
+              '[aria-label*="' + selector + '"]',
+              '[class*="' + selector + '"]'
+            ];
+            
+            for (const pattern of patterns) {
               try {
-                const element = ${strategy};
-                if (!element) return { error: 'element not found' };
-                
-                const rect = element.getBoundingClientRect();
-                const style = getComputedStyle(element);
-                
-                // Skip if element is completely hidden
-                if (style.display === 'none' || style.visibility === 'hidden') {
-                  return { error: 'element hidden' };
-                }
-                
-                // For basic elements, be more lenient
-                const isBasic = ${isBasicElement || isCommonElement};
-                if (isBasic || (rect.width > 0 && rect.height > 0)) {
-                  const x = rect.width > 0 ? rect.left + rect.width / 2 : rect.left + 10;
-                  const y = rect.height > 0 ? rect.top + rect.height / 2 : rect.top + 10;
-                  
-                  return {
-                    x: Math.max(x, 10),
-                    y: Math.max(y, 10),
-                    strategy: ${i},
-                    width: rect.width,
-                    height: rect.height
-                  };
-                }
-                
-                return { error: 'element not visible or too small' };
-              } catch (err) {
-                return { error: err.message };
+                element = document.querySelector(pattern);
+                if (element) break;
+              } catch (e) {
+                // Invalid selector, skip
               }
-            })()
-          `
-        });
-        
-        if (result.result?.value && !result.result.value.error) {
-          const elementInfo = result.result.value;
-          logger.info(`✅ Element found using strategy ${i}: ${strategy.substring(0, 50)}...`);
-          return elementInfo;
-        } else {
-          const errorMsg = result.result?.value?.error || 'Unknown error';
-          logger.debug(`❌ Strategy ${i} failed: ${errorMsg}`);
-        }
-      } catch (error) {
-        logger.debug(`❌ Strategy ${i} exception:`, error);
+            }
+          }
+          
+          // Strategy 3: Text search for simple text
+          if (!element && selector.length < 50 && !selector.includes('[') && !selector.includes('.') && !selector.includes('#')) {
+            const clickables = Array.from(document.querySelectorAll('a, button, [role="button"], [onclick]'));
+            element = clickables.find(el => el.textContent && el.textContent.includes(selector));
+          }
+          
+          if (!element) {
+            return { error: 'Element not found' };
+          }
+          
+          const rect = element.getBoundingClientRect();
+          if (rect.width === 0 || rect.height === 0) {
+            return { error: 'Element not visible' };
+          }
+          
+          return {
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2,
+            width: rect.width,
+            height: rect.height
+          };
+        })())
+      `
+    });
+    
+    if (result.result?.value) {
+      const elementData = JSON.parse(result.result.value);
+      
+      if (elementData.error) {
+        throw new Error(`Element not found: "${selector}". ${elementData.error}`);
       }
+      
+      logger.info(`✅ Element found: ${selector}`);
+      return elementData;
     }
-
-    // CRITICAL FIX: Provide specific error message instead of generic retry loop
-    throw new Error(`Element not found: "${selector}". Tried ${strategies.length} strategies. Element may not exist, be hidden, or selector may be incorrect.`);
+    
+    throw new Error(`Element not found: "${selector}". No result from evaluation.`);
   }
 
   private async waitForSelector(client: CDPClient, selector: string, timeout: number = ChromeAutomation.DEFAULT_TIMEOUT): Promise<void> {

@@ -1,0 +1,71 @@
+# Source code
+src/
+*.ts
+*.tsx
+*.js
+*.jsx
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!typedoc.json
+!vitest.config.ts
+
+# Documentation
+docs/
+*.md
+!README.md
+!LICENSE
+!CHANGELOG.md
+
+# Testing
+coverage/
+.nyc_output/
+test-results/
+test-logs/
+**/test-data/
+tmp/
+.tmp/
+.temp/
+chrome-debug-*/
+
+# Debug logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+.env.test
+.env.production
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Keep dist and assets
+!dist/
+!assets/ 

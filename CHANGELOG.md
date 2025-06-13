@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.9-beta.21] - 2025-06-12
+
+### 🚨 CRITICAL BUG FIXES - Beta Test Report Resolution
+
+#### Fixed
+- **🔧 CSS Selector-Based Clicking**: Fixed critical issue with CSS selector-based clicking
+  - **Root Cause**: Overly complex element detection strategies causing failures
+  - **Solution**: Simplified to use direct CSS selector approach
+  - **Impact**: CSS selectors now work correctly, including nth-of-type and Material-UI selectors
+
+- **🔧 Automation Framework**: Fixed missing interact action support
+  - **Root Cause**: AutomationStep interface missing interact action type
+  - **Solution**: Added full interact action support with visual selection methods
+  - **Impact**: Automation scripts can now use all interact features
+
+#### Enhanced
+- **🎯 Element Detection Reliability**: Improved element finding strategies
+  - Better error messages for element selection failures
+  - Enhanced JavaScript expression evaluation with proper error handling
+  - Improved coordinate calculation and element visibility checks
+  
+- **📖 Automation Script Support**: Extended automation capabilities
+  - Full `discover_links` action implementation with link metadata
+  - Enhanced automation result structure with monitoring data
+  - Better error handling and progress tracking for all automation actions
+
+#### Technical Changes
+- **Updated AutomationStep Interface**: Added `discover_links` to supported actions
+- **Enhanced InteractionOptions**: Added JavaScript expression support properties  
+- **New clickElementByJavaScript Method**: Direct JavaScript evaluation for complex selections
+- **Improved CLI Processing**: Proper handling of visual selection methods with JavaScript expressions
+- **Enhanced chrome-control Loop**: Comprehensive timeout and safety features
+
+#### Validation
+All issues from comprehensive bug report resolved:
+```bash
+✅ clits interact --click-text "Save" --chrome-port 9222           # Text-based clicking works
+✅ clits interact --click "button:nth-of-type(2)" --chrome-port 9222  # CSS selectors work
+✅ clits interact --click ".MuiButton-root:nth-of-type(1)" --chrome-port 9222  # Material-UI selectors work
+✅ clits automate --script test.json --chrome-port 9222  # Automation framework works
+```
+
 ## [1.0.9-beta.18] - 2025-06-12
 
 ### 🚨 CRITICAL BUG FIXES - OnDeck Bug Report Resolution
