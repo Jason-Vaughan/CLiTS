@@ -370,6 +370,26 @@ clits-inspect --chrome-port 9222
 
 CLiTS is specifically designed for AI assistants with a complete automation framework that requires **zero human interaction**. The AI automation framework provides structured JSON output perfect for programmatic analysis and decision-making.
 
+## 🚨 **AI ASSISTANT VISION RULES**
+
+**MANDATORY:** When automation actions fail, AI assistants must use CLITS vision capabilities to debug:
+
+```bash
+# When actions fail, immediately use vision:
+clits interact --chrome-port 9222 --screenshot debug.png --selector-map --stdout
+
+# Before complex automation, see what's available:
+clits interact --chrome-port 9222 --selector-map --with-metadata --annotated
+```
+
+**Vision-First Debugging Workflow:**
+1. Action fails → Capture vision immediately
+2. Analyze selector map → Identify available text/elements
+3. Adjust automation → Use confirmed available text/selectors
+4. Re-test → Verify fix works
+
+This eliminates guesswork and provides immediate visibility into page state and available elements.
+
 ### 🤖 AI Automation Framework
 
 Use the `clits-inspect` command with automation flags for fully automated workflows:
@@ -554,4 +574,36 @@ clits-inspect --auto --json --action navigate --url "http://localhost:3000/admin
 clits-inspect --auto --json --action logs --duration 30 --target-priority localhost
 ```
 
-The automation framework handles Chrome launching, tab selection, and provides structured JSON responses perfect for AI analysis. All commands are designed to work without any human intervention. 
+The automation framework handles Chrome launching, tab selection, and provides structured JSON responses perfect for AI analysis. All commands are designed to work without any human intervention.
+
+#### **NEW: Text & Region-based Automation Actions (v1.0.9-beta.26)**
+
+**Critical Update:** Added missing `click-text` and `click-region` actions to automation framework:
+
+```json
+{
+  "steps": [
+    {"action": "navigate", "url": "http://localhost:5173", "timeout": 10000},
+    {"action": "wait", "selector": "body", "timeout": 2000},
+    {"action": "click-text", "text": "Dashboard", "wait": 1000, "screenshotPath": "navigation.png"},
+    {"action": "click-text", "text": "Settings", "wait": 1000},
+    {"action": "click-region", "region": "center", "wait": 500},
+    {"action": "screenshot", "path": "final-result.png"}
+  ],
+  "options": {
+    "timeout": 30000,
+    "captureNetwork": true,
+    "monitor": true
+  }
+}
+```
+
+**Supported Actions:**
+- `click-text`: Click elements containing specific text (most reliable for React/MUI apps)
+- `click-region`: Click by screen region (`top-left`, `top-right`, `bottom-left`, `bottom-right`, `center`)
+- Both support `wait` parameter (recommended: 500-1000ms) and optional `screenshotPath`
+
+**Usage:**
+```bash
+clits automate --script automation.json --chrome-port 9222 --save-results results.json
+``` 

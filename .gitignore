@@ -24,6 +24,11 @@ tmp/
 .temp/
 chrome-debug-*/
 
+# Test result JSON files (may contain sensitive data)
+*-results.json
+test-*.json
+final-test-*.json
+
 # Debug logs
 logs/
 *.log

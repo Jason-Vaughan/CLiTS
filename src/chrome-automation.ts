@@ -83,18 +83,21 @@ export interface InteractionResult {
 }
 
 export interface AutomationStep {
-  action: 'navigate' | 'wait' | 'click' | 'type' | 'toggle' | 'screenshot' | 'discover_links' | 'interact';
+  action: 'navigate' | 'wait' | 'click' | 'type' | 'toggle' | 'screenshot' | 'discover_links' | 'interact' | 'click-text' | 'click-region';
   url?: string;
   selector?: string;
   text?: string;
   path?: string;
   timeout?: number;
+  wait?: number; // wait time in milliseconds after action completion
   // New interact action properties
   clickText?: string;
   clickColor?: string;
   clickRegion?: string;
   clickDescription?: string;
   screenshotPath?: string;
+  // New dedicated action properties
+  region?: string; // for click-region action
 }
 
 export interface AutomationScript {
@@ -714,6 +717,42 @@ export class ChromeAutomation {
         
         if (!interactResult.success) {
           throw new Error(interactResult.error || 'Interaction failed');
+        }
+        break;
+      }
+
+      case 'click-text': {
+        if (!step.text) throw new Error('Click-text step requires text');
+        const jsExpression = await this.findElementByText(step.text);
+        await this.clickElementByJavaScript(client, jsExpression);
+        
+        // Wait if specified
+        if (step.wait) {
+          await new Promise(resolve => setTimeout(resolve, step.wait));
+        }
+        
+        // Take screenshot if requested
+        if (step.screenshotPath) {
+          await this.takeScreenshot(client, step.screenshotPath);
+          result.screenshots!.push(step.screenshotPath);
+        }
+        break;
+      }
+
+      case 'click-region': {
+        if (!step.region) throw new Error('Click-region step requires region');
+        const jsExpression = await this.findElementByRegion(step.region);
+        await this.clickElementByJavaScript(client, jsExpression);
+        
+        // Wait if specified
+        if (step.wait) {
+          await new Promise(resolve => setTimeout(resolve, step.wait));
+        }
+        
+        // Take screenshot if requested
+        if (step.screenshotPath) {
+          await this.takeScreenshot(client, step.screenshotPath);
+          result.screenshots!.push(step.screenshotPath);
         }
         break;
       }
