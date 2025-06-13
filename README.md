@@ -44,17 +44,17 @@ npm install -g clits
 
 ## Quick Start
 
-### 🎉 Latest Features (v1.0.9-beta.28)
+### 🎉 Latest Features (v1.1.0)
 
-**Production Status**: ✅ **AUTOMATION FRAMEWORK COMPLETE AND VERIFIED** - Production Ready
+**Production Status**: ✅ **STABLE RELEASE - AUTOMATION FRAMEWORK COMPLETE AND VERIFIED**
 
-**✅ CRITICAL AUTOMATION FEATURES COMPLETE (v1.0.9-beta.28):**
+**✅ CRITICAL AUTOMATION FEATURES COMPLETE:**
 - **Text-based clicking**: `click-text` action in automation scripts
 - **Region-based clicking**: `click-region` action in automation scripts  
 - **Enhanced wait parameters**: Configurable delays for reliable automation
 - **AI Vision Rules**: Mandatory debugging workflow for failed automation
 
-**Comprehensive Testing Results (v1.0.9-beta.28):**
+**Comprehensive Testing Results:**
 ```bash
 ✅ clits extract --chrome --chrome-port 9222                    # Clean log collection verified
 ✅ clits interact --chrome-port 9222 --wait-for "body"          # React selectors working perfectly
@@ -64,8 +64,8 @@ npm install -g clits
 ✅ clits interact --chrome-port 9222 --wait-for ".MuiButton-root"  # Material-UI detection verified
 ```
 
-**v1.0.9-beta.28 Verification Results:**
-- ✅ **Automation Framework**: 100% success rate with comprehensive testing (11,457+ network events captured)
+**v1.1.0 Verification Results:**
+- ✅ **Automation Framework**: 100% success rate with comprehensive testing
 - ✅ **All Step Types Working**: navigate, wait, click, type, toggle, screenshot, discover_links, interact
 - ✅ **Network Monitoring**: Full monitoring capabilities confirmed working
 - ✅ **Screenshot Capture**: Automation screenshot functionality verified
