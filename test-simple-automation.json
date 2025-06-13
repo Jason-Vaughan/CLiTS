@@ -1,0 +1,11 @@
+{
+  "steps": [
+    {"action": "navigate", "url": "http://localhost:5173"},
+    {"action": "wait", "selector": "body", "timeout": 5000},
+    {"action": "screenshot", "path": "test-automation-screenshot.png"}
+  ],
+  "options": {
+    "timeout": 10000,
+    "monitor": false
+  }
+} 
