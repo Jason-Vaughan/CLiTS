@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.9-beta.29] - 2025-06-13
+
+### 🎨 **LOGO DISPLAY FIX**
+
+#### Fixed
+- **✅ NPM Website Logo Display**: Added logo image to README.md for NPM website display
+  - **Root Cause**: NPM displays README content but doesn't use package.json "logo" field for website display
+  - **Solution**: Added centered logo image at top of README.md using GitHub URL
+  - **Impact**: Logo now displays prominently on NPM package page
+
+#### Enhanced
+- **📚 Visual Branding**: Improved package presentation on NPM website
+  - **Centered logo**: Professional presentation at top of README
+  - **Proper sizing**: 200x200px display size for optimal viewing
+  - **GitHub CDN**: Uses verified accessible GitHub URL for reliable display
+
 ## [1.0.9-beta.28] - 2025-06-13
 
 ### ✅ **TEST FIXES VERIFICATION & DOCUMENTATION UPDATE**

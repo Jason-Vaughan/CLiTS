@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="https://raw.githubusercontent.com/Jason-Vaughan/CLiTS/refs/heads/main/assets/logo.png" alt="CLiTS Logo" width="200" height="200">
+</div>
+
 # CLiTS (Chrome Log Inspector & Troubleshooting System)
 
 A powerful CLI tool for extracting and sharing debugging data (logs, network info, etc.) for AI and web projects. CLI-first, with future browser extension support.
