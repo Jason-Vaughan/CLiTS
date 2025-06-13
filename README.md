@@ -1,97 +1,24 @@
-# CLiTS - Chrome Log Inspector & Troubleshooting System
+# CLiTS (Chrome Log Inspector & Troubleshooting System)
 
-<p align="center">
-  <img src="https://github.com/Jason-Vaughan/CLiTS/blob/main/assets/logo.png?raw=true" alt="CLiTS Logo" width="320"/>
-</p>
-
-<!-- Badges: npm version, build status, license, etc. -->
-
-[![npm version](https://img.shields.io/npm/v/@puberty-labs/clits.svg)](https://www.npmjs.com/package/@puberty-labs/clits)
-[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Getting Started](https://img.shields.io/badge/start%20with-clits--inspect-brightgreen.svg)](#quick-start)
-
----
-
-> **CLiTS** (Chrome Log Inspector & Troubleshooting System) is a powerful developer tool that bridges the gap between browser debugging and automated analysis. Get started in seconds with the interactive `clits-inspect` wizard, or build custom automation workflows for your specific needs. It's designed to make web application debugging more efficient by:
->
-> 🧙‍♂️ **Interactive Wizard**: Start debugging instantly with the guided `clits-inspect` command
->
-> 🔍 **Automated Log Collection**: Capture Chrome DevTools logs, network requests, and DOM state without manual inspection
->
-> 🤖 **AI-Ready Output**: Generate structured, parseable output that's perfect for AI analysis and automated debugging
->
-> 🔄 **Interactive Workflows**: Handle complex scenarios like authenticated sessions and dynamic content with ease
->
-> 🛠️ **Extensible Architecture**: Build custom automation workflows or integrate with your existing testing infrastructure
->
-> Whether you're debugging a complex web application, automating browser testing, or building AI-powered developer tools, CLiTS streamlines the process of collecting and analyzing browser data. It's particularly valuable for:
->
-> - **Developers** troubleshooting hard-to-reproduce issues
-> - **QA Teams** building automated testing pipelines
-> - **AI Assistants** gathering real-time browser diagnostics
-> - **DevOps** monitoring web application health
->
-> CLiTS turns the tedious process of browser debugging into a streamlined, programmatic workflow.
-
----
-
-## Table of Contents
-
-- [Features](#features)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [CLI Commands & Options](#cli-commands--options)
-- [Output Format](#output-format)
-- [Examples](#examples)
-- [For AI Assistants](#for-ai-assistants)
-- [Contributing](#contributing)
-- [License](#license)
-
----
+A powerful CLI tool for extracting and sharing debugging data (logs, network info, etc.) for AI and web projects. CLI-first, with future browser extension support.
 
 ## Features
 
-- **Browser Automation**: Navigate to URLs, interact with elements, and run scripted automation workflows
-- **Screenshot Capture**: Take full-page screenshots during navigation and interactions
-- **Network Monitoring**: Capture network requests and responses during automation
-- **visionCLITS** (✅ Available in v1.0.8-beta.1): Advanced visual state capture and screenshot automation
-  - Element-specific screenshots with CSS selector support
-  - Full-page screenshot capability with metadata extraction
-  - Base64/stdout output for AI integration
-  - Batch screenshot mode for multiple selectors
-  - Visual state analysis with element detection and validation
-  - Visual state metadata extraction
-  - AI-friendly output formats
-- **OnDeck Priority Features** (✅ Available in v1.0.8-beta.1):
-  - Base64 Screenshot Output for AI processing
-  - Visual Element Selection:
-    - Click by text content (e.g., "Save", "Submit")
-    - Click by color (hex, rgb, or name)
-    - Click by screen region (top-left, top-right, etc.)
-    - Click by visual description (AI-powered)
-  - Enhanced Screenshot Features:
-    - Element position metadata
-    - Visual annotations
-    - Clickable element maps
-    - JSON output format
-    - Full-page capture
-  - Selector Discovery Tools:
-    - Find all CSS selectors
-    - List clickable elements
-    - Generate element maps
-    - Multiple output formats
-- Generic website inspection with automatic log collection
-- Console, network, and DOM inspection
-- Advanced Logging (Structured logging with metadata, log rotation and size management, timestamp synchronization)
-- Component Monitoring (React hooks, lifecycle tracking, prop changes)
-- Network Analysis (Request/response correlation, WebSocket tracking, JWT token monitoring, GraphQL support)
-- State Management (Redux state visualization, state change tracking, middleware debugging)
-- Performance Monitoring (React render metrics, memory usage tracking, event loop monitoring)
-- UI Interaction (User interaction recording, DOM mutation tracking, CSS change monitoring)
-- Interactive login handling
-- AI-friendly output format
-- Extensible for custom automation
+- **Chrome Integration**: Connect to Chrome DevTools protocol for real-time debugging
+- **Log Extraction**: Capture console logs, network requests, and errors
+- **Visual Debugging**: Screenshot capture with element highlighting
+- **Element Detection**: Advanced CSS selector and visual element finding
+- **Automation Framework**: JSON-based automation scripts
+- **Network Monitoring**: Request/response tracking and analysis
+- **Advanced Logging**: Structured logging with metadata, log rotation and size management
+- **Component Monitoring**: React hooks, lifecycle tracking, prop changes
+- **Network Analysis**: Request/response correlation, WebSocket tracking, JWT token monitoring, GraphQL support
+- **State Management**: Redux state visualization, state change tracking, middleware debugging
+- **Performance Monitoring**: React render metrics, memory usage tracking, event loop monitoring
+- **UI Interaction**: User interaction recording, DOM mutation tracking, CSS change monitoring
+- **Interactive login handling**
+- **AI-friendly output format**
+- **Extensible for custom automation**
 
 ---
 
@@ -113,7 +40,7 @@ npm install -g clits
 
 ## Quick Start
 
-### 🎉 Latest Features (v1.0.9-beta.21)
+### 🎉 Latest Features (v1.0.9-beta.22)
 
 **Production Status**: ✅ **ALL AUTOMATION FEATURES RESOLVED** - Ready for production use
 
@@ -127,83 +54,68 @@ npm install -g clits
 ✅ clits interact --chrome-port 9222 --wait-for ".MuiButton-root"  # Material-UI detection
 ```
 
-**Latest Enhancements (v1.0.9-beta.21):**
+**Latest Enhancements (v1.0.9-beta.22):**
 - ✅ **Material-UI Support**: Comprehensive selector patterns for Material-UI components
 - ✅ **Save Button Detection**: Intelligent strategies for reliable save button identification
 - ✅ **Tab Discovery**: New command for discovering and interacting with tabs
-- ✅ **Documentation**: Mandatory updates for all NPM releases (including beta versions)
 
-**Previous Fixes (v1.0.7-beta.2):**
-- ✅ **Log Collection**: Eliminated all "Invalid log entry" validation warnings
-- ✅ **React Selectors**: Fixed timeout issues with `body`, `html`, and basic DOM elements
-- ✅ **Command Parsing**: Resolved chrome-control parameter parsing conflicts
-- ✅ **Automation Workflows**: Multi-step JSON workflows now complete successfully
+### Basic Usage
 
-### Installation & Setup
+```bash
+# Extract logs from Chrome
+clits extract --chrome --chrome-port 9222
 
-1. **Install CLiTS:**
-   ```sh
-   npm install -g @puberty-labs/clits@beta
-   ```
+# Interact with page elements
+clits interact --click-text "Save" --chrome-port 9222
+clits interact --click-region "center" --chrome-port 9222
 
-2. **Start Chrome with remote debugging enabled:**
-   ```sh
-   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug
-   ```
+# Run automation script
+clits automate --script workflow.json --chrome-port 9222
+```
 
-3. **Run the generic website inspector:**
-   ```sh
-   clits extract --chrome --chrome-port 9222
-   ```
-   *If multiple Chrome tabs are open, you will be prompted to select one.*
-   *Alternatively, specify a target ID directly:*
-   ```sh
-   clits extract --chrome --chrome-port 9222 --target-id <YOUR_TARGET_ID>
-   ```
+### Advanced Features
 
----
+```bash
+# Visual element selection
+clits interact --click-text "Save"               # Click element containing "Save"
+clits interact --click-text "Submit"             # Click element containing "Submit"
+clits interact --click-color "#ff0000"           # Click by color
+clits interact --click-region "top-left"         # Click by screen region
+clits interact --click-description "edit button" # Click by visual description
 
-## CLI Commands & Options
+# Enhanced screenshot features
+clits interact --screenshot --with-metadata    # Include element positions/text
+clits interact --screenshot --annotated        # Draw boxes around clickable elements
+clits interact --screenshot --selector-map     # Output clickable element map
+clits interact --screenshot --fullpage --base64  # Full-page base64 output
+
+# Selector discovery tools
+clits inspect --find-selectors                 # List all available CSS selectors
+clits inspect --find-clickable                 # List clickable elements with coordinates
+clits inspect --element-map                    # Visual map of page elements
+clits inspect --output-format json             # JSON output for AI processing
+
+# Combined AI automation workflow
+clits interact --click-text "Edit" --screenshot --base64 --selector-map --stdout
+```
+
+## Commands
 
 ### `clits extract`
-Extract debugging data from files or a Chrome session.
+Extract logs and debugging data from various sources.
 
 **Options:**
-- `-s, --source <path>`: Source directory path for file extraction
-- `-p, --patterns <patterns...>`: Log file patterns to match (default: `['*.log']`)
-- `-m, --max-size <size>`: Maximum file size in MB (default: `10`)
-- `-f, --max-files <count>`: Maximum number of files to process (default: `100`)
-- `--chrome`: Extract logs from an existing Chrome session. This now includes improved connection stability, automatic reconnection, and interactive selection for multiple Chrome tabs (requires Chrome running with `--remote-debugging-port=9222`).
-- `--chrome-host <host>`: Chrome DevTools host (default: `localhost`)
+- `--chrome`: Extract from Chrome DevTools
 - `--chrome-port <port>`: Chrome DevTools port (default: `9222`)
-- `--target-id <id>`: Specify a Chrome tab/page target ID to connect to when using `--chrome`. If not provided and multiple targets are found, an interactive prompt will appear.
-- `--no-network`: Exclude network logs from Chrome DevTools
-- `--no-console`: Exclude console logs from Chrome DevTools
-- `--include-react-hooks`: Include React hook monitoring
-- `--include-component-lifecycle`: Include React component lifecycle tracking
-- `--include-prop-changes`: Include React prop change monitoring
-- `--include-websockets`: Include WebSocket traffic monitoring
-- `--include-jwt-monitoring`: Include JWT token monitoring
-- `--include-graphql-monitoring`: Include GraphQL request/response monitoring
-- `--include-redux-monitoring`: Include Redux state monitoring
-- `--include-state-changes`: Include Redux state change tracking
-- `--include-middleware-debugging`: Include Redux middleware debugging
-- `--include-render-metrics`: Include React render metrics
-- `--include-memory-usage`: Include memory usage tracking
-- `--include-event-loop`: Include event loop monitoring
-- `--include-user-interaction`: Include user interaction recording
-- `--include-dom-mutation`: Include DOM mutation tracking
-- `--include-css-changes`: Include CSS change monitoring
-- `--log-levels <levels>`: Filter by log levels (comma-separated, default: `error,warning,info,debug`)
-- `--sources <sources>`: Filter by sources (comma-separated, default: `network,console,devtools`)
-- `--domains <domains>`: Filter by domain patterns (comma-separated)
-- `--keywords <keywords>`: Filter by keywords (comma-separated)
-- `--exclude <patterns>`: Exclude logs matching patterns (comma-separated)
-- `--advanced-filter <expression>`: Advanced boolean filter expression, e.g., `(React AND error) OR (network AND 404)`
-- `--group-by-source`: Group logs by their source
-- `--group-by-level`: Group logs by their level
-- `--no-stack-traces`: Exclude stack traces from output
-- `--output-file <path>`: Save logs to the specified file path
+- `--chrome-host <host>`: Chrome DevTools host (default: `localhost`)
+- `--source <path>`: Extract from local log files
+- `--patterns <glob>`: File patterns to match
+- `--output-file <path>`: Save output to file
+- `--format <format>`: Output format (json|text)
+- `--filter <pattern>`: Filter logs by pattern
+- `--time-range <range>`: Filter by time range
+- `--log-levels <levels>`: Filter by log levels
+- `--group-by-source`: Group logs by source
 - `--error-summary`: Include summary statistics of error frequencies
 - `--live-mode [duration]`: Run in live mode for specified duration in seconds (default: `60`)
 - `--interactive-login`: This option is deprecated. Interactive login is now automatically handled if needed based on the selected Chrome tab.
@@ -257,58 +169,18 @@ clits discover-links --chrome-port 9222
 - `--chrome-host <host>`: Chrome DevTools host (default: `localhost`)
 - `--chrome-port <port>`: Chrome DevTools port (default: `9222`)
 - `--tab-label <label>`: Select tab by label after discovery
-- `--tab-label-regex <pattern>`: Select tab by regex pattern  
+- `--tab-label-regex <pattern>`: Select tab by regex pattern
 - `--custom-save-patterns <patterns>`: Custom save button text patterns (comma-separated)
 - `--find-save-button`: Also discover the best save button in the current dialog
 - `--verbose`: Enable verbose output
 
-**Material-UI Integration:**
-- **Comprehensive Component Support**: `.MuiButton-root`, `.MuiIconButton-root`, `.MuiFab-root`, `.MuiToggleButton-root`, `.MuiDialog-root`, `.MuiModal-root`, `.MuiTab-root`, `.MuiTabs-root`, `.MuiSwitch-root`, `.MuiCheckbox-root`, `.MuiRadio-root`, `.MuiDialogActions-root`, `.MuiCardActions-root`, `.MuiButtonGroup-root`
-- **Intelligent Save Button Detection**: By text ("Save", "Update", "Apply", "OK", "Done", "Submit", "Confirm"), by attributes (`type="submit"`, `aria-label`, `title`), by icons (save icons in `.MuiSvgIcon-root`), in action areas (`.MuiDialogActions-root`, `.modal-footer`)
-- **Smart Fallbacks**: Single enabled button detection, primary button detection
-
-**Output Format:**
-```json
-{
-  "success": true,
-  "targetUrl": "http://localhost:5173/displays",
-  "targetTitle": "Display Manager",
-  "tabCount": 4,
-  "tabs": [
-    {
-      "label": "Basic Options",
-      "selector": "[aria-label=\"Basic Options\"]",
-      "index": 0,
-      "isActive": true,
-      "isDisabled": false
-    },
-    {
-      "label": "Header Options", 
-      "selector": ":contains(\"Header Options\")",
-      "index": 1,
-      "isActive": false,
-      "isDisabled": false
-    }
-  ],
-  "saveButton": {
-    "x": 450,
-    "y": 600,
-    "strategy": "text-content",
-    "text": "Save Changes"
-  }
-}
-```
-
-**Example Usage:**
+**Examples:**
 ```bash
-# Discover all tabs in current dialog
+# Basic tab discovery
 clits discover-tabs --chrome-port 9222
 
-# Discover tabs and click "Header Options"
-clits discover-tabs --chrome-port 9222 --tab-label "Header Options"
-
-# Regex-based tab selection
-clits discover-tabs --chrome-port 9222 --tab-label-regex "Header|Fields"
+# Find save button with default patterns
+clits discover-tabs --chrome-port 9222 --find-save-button
 
 # Discover tabs + find save button with custom patterns
 clits discover-tabs --chrome-port 9222 --find-save-button --custom-save-patterns "Apply,Update,Confirm"
@@ -401,138 +273,31 @@ clits automate --script test-workflow.json --chrome-port 9222
 
 #### 🚀 NEW in v1.0.9-beta.1: Roadmap Features
 
-#### Core Screenshot Options:
-- `--screenshot`: Take screenshot(s)
-- `--selector <selector>`: CSS selector for element-specific screenshot
-- `--selectors <selectors>`: Multiple CSS selectors (comma-separated)
-- `--output <path>`: Output file path for screenshot
-- `--output-dir <dir>`: Output directory for multiple screenshots
-- `--meta <path>`: Output JSON metadata file path
+**Options:**
+- `--screenshot`: Take a screenshot
+- `--video`: Record video of the interaction
+- `--selectors <selectors>`: CSS selectors to target
+- `--output <path>`: Output file path
+- `--output-dir <dir>`: Output directory for batch processing
+- `--base64`: Output as base64 string
 - `--fullpage`: Take full-page screenshot
-- `--base64`: Output screenshot as base64 to stdout
-- `--stdout`: Output results to stdout (JSON format)
-- `--include-text`: Include text content in metadata
-- `--include-styles`: Include computed styles in metadata
-- `--include-bbox`: Include bounding box information
-- `--include-visibility`: Include visibility state information
-
-#### 🔍 Visual Diff Capabilities (NEW):
-- `--diff`: Enable visual diff mode for regression testing
-- `--baseline <path>`: Baseline screenshot or directory for comparison
-- `--compare-with <path>`: Compare current screenshot with this image
-- `--diff-threshold <number>`: Diff sensitivity threshold (0-1, default: 0.1)
-- `--diff-output <path>`: Output path for diff result image
-- `--diff-report <path>`: Output path for diff analysis JSON report
-- `--save-baseline`: Save current screenshot as new baseline
-- `--batch-diff`: Enable batch processing for multiple screenshot comparisons
-
-#### 🎥 Video Capture Capabilities (NEW):
-- `--video`: Enable video recording for interaction workflows
-- `--video-output <path>`: Output path for recorded video (default: clits-recording.webm)
-- `--video-duration <seconds>`: Recording duration in seconds (default: 30)
-- `--video-fps <fps>`: Video frame rate (default: 10)
-
-#### 🎨 Advanced Element Highlighting (NEW):
-- `--highlight`: Add visual annotations to screenshots
-- `--highlight-color <color>`: Color for element highlighting (hex, default: #ff0000)
-- `--highlight-thickness <pixels>`: Border thickness for highlighting (default: 3)
-- `--highlight-all-clickable`: Highlight all clickable elements on the page
-- `--annotate-text`: Add text labels to highlighted elements
-
-#### System Options:
+- `--highlight-all-clickable`: Highlight all clickable elements
+- `--highlight-color <color>`: Custom highlight color
+- `--annotate-text`: Add text annotations
+- `--batch-diff`: Enable batch difference analysis
+- `--baseline-dir <dir>`: Directory containing baseline images
+- `--diff-threshold <value>`: Difference threshold (0-1)
+- `--diff-report <path>`: Save diff analysis report
+- `--meta <path>`: Save metadata to file
 - `--chrome-host <host>`: Chrome DevTools host (default: `localhost`)
 - `--chrome-port <port>`: Chrome DevTools port (default: `9222`)
-- `--timeout <ms>`: Timeout in milliseconds (default: `30000`)
-
-**Visual State Metadata:**
-VisionCLITS captures comprehensive element information:
-```json
-{
-  "selector": ".error-message",
-  "exists": true,
-  "visible": true,
-  "boundingBox": {
-    "x": 100, "y": 200, "width": 300, "height": 50,
-    "top": 200, "left": 100, "right": 400, "bottom": 250
-  },
-  "textContent": "Error: Connection failed",
-  "computedStyles": {
-    "display": "block", "visibility": "visible", "opacity": "1",
-    "position": "absolute", "backgroundColor": "rgb(255, 0, 0)",
-    "color": "rgb(255, 255, 255)", "fontSize": "14px"
-  },
-  "screenshotPath": "error_0.png"
-}
-```
 
 **Examples:**
+```bash
+# Basic screenshot with element highlighting
+clits vision --screenshot --selectors ".header,.content" --output "page.png"
 
-#### Core Screenshot Examples:
-```sh
-# Element-specific screenshot with metadata
-clits vision --screenshot --selector ".error-message" --output "error.png" --meta "error.json"
-
-# Multiple selectors with batch processing
-clits vision --screenshot --selectors ".error,.warning" --output-dir "./screenshots"
-
-# Full-page screenshot with base64 output
-clits vision --screenshot --fullpage --output "page.png" --base64
-
-# Comprehensive element analysis
-clits vision --screenshot --selector ".button" --include-text --include-styles --include-bbox --meta "analysis.json"
-
-# JSON output to stdout for AI integration
-clits vision --screenshot --selectors "h1,button" --stdout
-
-# Visual state capture for debugging
-clits vision --screenshot --selector ".dialog" --include-text --include-visibility --meta "debug.json"
-```
-
-#### 🔍 Visual Diff Examples (NEW):
-```sh
-# Create baseline screenshot for regression testing
-clits vision --screenshot --fullpage --save-baseline --baseline "ui-baseline.png"
-
-# Compare current state with baseline and generate diff
-clits vision --screenshot --fullpage --diff --baseline "ui-baseline.png" --diff-output "changes.png" --diff-report "analysis.json"
-
-# Batch visual regression testing with custom threshold
-clits vision --screenshot --selectors ".header,.footer,.main" --batch-diff --baseline-dir "./baselines" --diff-threshold 0.05
-
-# Compare specific element changes
-clits vision --screenshot --selector ".login-form" --diff --baseline "login-baseline.png" --diff-output "login-diff.png"
-
-# Visual consistency validation across deployments
-clits vision --screenshot --fullpage --compare-with "production-screenshot.png" --diff-threshold 0.02 --diff-report "deployment-validation.json"
-```
-
-#### 🎥 Video Capture Examples (NEW):
-```sh
-# Record 60-second workflow at high quality
-clits vision --video --video-duration 60 --video-fps 15 --video-output "user-workflow.webm"
-
-# Combine video recording with screenshot capture
-clits vision --video --screenshot --fullpage --output "final-state.png" --video-output "interaction-recording.webm"
-
-# Record bug reproduction with custom settings
-clits vision --video --video-duration 45 --video-fps 12 --video-output "bug-reproduction.webm"
-
-# Create automated testing demo
-clits vision --video --video-duration 120 --video-fps 10 --video-output "automation-demo.webm"
-```
-
-#### 🎨 Advanced Highlighting Examples (NEW):
-```sh
-# Highlight all clickable elements with custom styling
-clits vision --screenshot --fullpage --highlight-all-clickable --highlight-color "#00ff00" --highlight-thickness 5
-
-# Add text annotations to highlighted elements
-clits vision --screenshot --selector ".navigation" --highlight --annotate-text --output "annotated-nav.png"
-
-# Visual debugging of element positioning
-clits vision --screenshot --selectors ".button,.link,.form" --highlight --highlight-color "#ff00ff" --highlight-thickness 2
-
-# Generate UI documentation with annotations
+# Full-page screenshot with annotations
 clits vision --screenshot --fullpage --highlight-all-clickable --annotate-text --output "ui-documentation.png"
 
 # Accessibility analysis visualization
@@ -564,61 +329,24 @@ Interactive website inspector for Chrome with hierarchical element navigation.
 
 **Features:**
 - **Hierarchical Element Navigation**: Navigate through page elements organized by DOM depth levels
-- **Enhanced Element Detection**: Finds 79+ interactive elements using 53+ selector patterns including:
-  - Material-UI components (`.MuiButton-root`, `.MuiIconButton-root`, `.MuiDialog-root`, `.MuiTab-root`, `.MuiSwitch-root`)
-  - Intelligent save button detection in dialogs
-  - Tab label discovery for tabbed interfaces
-  - Data attributes (`[data-testid]`, `[data-cy]`, etc.)
-  - ARIA labels and roles
-  - Text-based element detection
-  - CSS class patterns (*button*, *click*, *action*, *menu*, etc.)
+- **Real-time Element Inspection**: View element properties, styles, and computed values
+- **Network Monitoring**: Track requests and responses in real-time
+- **Console Integration**: Execute JavaScript in the context of the page
+- **Screenshot Capture**: Take screenshots of the current view or specific elements
+- **Element Selection**: Click to select elements in the page
+- **Search Functionality**: Find elements by selector, text, or attributes
+- **Export Options**: Save inspection data in various formats
 
-**Navigation Controls:**
-- **↑↓ Arrow Keys**: Navigate between elements at current level
-- **→ Right Arrow**: Go deeper into DOM hierarchy (see more specific elements)
-- **← Left Arrow**: Go up in DOM hierarchy (see broader elements)
-- **Enter**: Click selected element
-- **Esc**: Exit inspector
-
-**Material-UI Integration:**
-- **Dialog Support**: Automatic save button detection in dialogs
-- **Tab Navigation**: Discover and interact with tabbed interfaces
-- **Component Detection**: Enhanced support for Material-UI components
-- **Selector Patterns**: Robust selector patterns for all Material-UI components
-
-**Prompts:**
-- Website URL to inspect
-- Whether login is required (waits up to 30 seconds for manual login)
-- Select browser tab if multiple are open
-- Interactive element navigation with level indicators (Level 0/4, Level 1/4, etc.)
-- After diagnostics, choose to:
-  - Capture current page state again
-  - Navigate to a new URL
-  - Exit
-
-**Example Usage:**
+**Usage:**
 ```bash
-# Basic inspection
-clits inspect --chrome-port 9222
-
-# With Material-UI support
-clits inspect --chrome-port 9222 --mui
-
-# Discover tab labels
-clits inspect --chrome-port 9222 --discover-tabs
-
-# Intelligent save button detection
-clits inspect --chrome-port 9222 --smart-save
+clits-inspect --chrome-port 9222
 ```
 
----
-
-## Output Format
-
-The inspector outputs information in a structured format for easy AI parsing:
-
+**Output Format:**
 ```
-[CLiTS-INSPECTOR][CONSOLE][log] Console message
+[CLiTS-INSPECTOR][ELEMENTS] Element hierarchy
+[CLiTS-INSPECTOR][STYLES] Computed styles
+[CLiTS-INSPECTOR][PROPERTIES] Element properties
 [CLiTS-INSPECTOR][NETWORK][REQUEST] Network request details
 [CLiTS-INSPECTOR][NETWORK][RESPONSE] Network response details
 [CLiTS-INSPECTOR][DOM] DOM structure
@@ -823,49 +551,4 @@ clits-inspect --auto --json --action navigate --url "http://localhost:3000/admin
 clits-inspect --auto --json --action logs --duration 30 --target-priority localhost
 ```
 
-The automation framework handles Chrome launching, tab selection, and provides structured JSON responses perfect for AI analysis. All commands are designed to work without any human intervention.
-
----
-
-## Contributing
-
-Found a bug or have a suggestion? We'd love to hear from you! Puberty Labs is committed to continuous improvement of CLiTS and welcomes community feedback.
-
-### Ways to Contribute
-- **npm Feedback**: Leave a review or feedback on our [npm package page](https://www.npmjs.com/package/@puberty-labs/clits)
-- **GitHub Issues**: Open an issue for bugs or feature requests
-- **Pull Requests**: Submit code improvements or documentation updates
-
-### Local Development
-1. Clone the repo and install dependencies:
-   ```sh
-   git clone https://github.com/jasonvaughan/clits.git
-   cd clits
-   npm install
-   ```
-2. Build the project:
-   ```sh
-   npm run build
-   ```
-3. Run tests:
-   ```sh
-   npm test
-   ```
-4. Lint and fix code style:
-   ```sh
-   npm run lint:fix
-   ```
-
-### Submitting PRs
-- Fork the repo and create a feature branch
-- Add tests for new features or bug fixes
-- Ensure all tests pass and code is linted
-- Open a pull request with a clear description
-
-We appreciate all forms of contribution, from code to documentation to design feedback!
-
----
-
-## License
-
-MIT License - See [LICENSE](LICENSE) for details 
+The automation framework handles Chrome launching, tab selection, and provides structured JSON responses perfect for AI analysis. All commands are designed to work without any human intervention. 
