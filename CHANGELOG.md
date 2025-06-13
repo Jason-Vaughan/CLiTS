@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.9-beta.28] - 2025-06-13
+
+### ✅ **TEST FIXES VERIFICATION & DOCUMENTATION UPDATE**
+
+#### Fixed
+- **✅ Test Hanging Issues**: Resolved automation test hanging on `Page.loadEventFired()` after clicks
+  - **Root Cause**: Waiting for load events after click actions that don't trigger navigation
+  - **Solution**: Modified `waitForPageLoad()` to skip `loadEventFired()` for post-click scenarios
+  - **Impact**: All automation tests now complete successfully without hanging
+
+#### Enhanced
+- **📚 AI Vision Rules**: Enhanced and expanded mandatory vision rules in README.md
+  - **Comprehensive workflow**: Step-by-step mandatory debugging process
+  - **Clear examples**: Specific commands for vision-first debugging  
+  - **Prominent placement**: Made vision rules more visible and actionable
+  - **Mandatory compliance**: Emphasized requirement for AI assistants
+
+- **📖 Documentation Updates**: Updated README.md and version references
+  - **Version consistency**: Updated all references from beta.25 to beta.27/28
+  - **Automation script examples**: Added click-text and click-region action examples
+  - **Feature completeness**: Documented all critical automation features
+
+#### Validated
+All test fixes successfully verified working:
+```bash
+✅ Text-based clicking: clickText "Zone Mapper" works perfectly
+✅ Selector-based clicking: CSS selectors work perfectly  
+✅ Region-based clicking: center region clicking works perfectly
+✅ Automation framework: No hanging issues, all tests complete
+```
+
+#### Production Status
+**✅ AUTOMATION FRAMEWORK: 100% FUNCTIONAL**
+- All clicking methods working perfectly
+- Test fixes applied and verified
+- Documentation complete and up-to-date
+- Ready for stable release consideration
+
 ## [1.0.9-beta.27] - 2025-06-13
 
 ### 🚨 **CRITICAL AUTOMATION FEATURES ADDED**

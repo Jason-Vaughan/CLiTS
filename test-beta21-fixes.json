@@ -2,7 +2,7 @@
   "steps": [
     {
       "action": "navigate",
-      "url": "http://localhost:5173",
+      "url": "http://localhost:5173/dashboard",
       "timeout": 10000
     },
     {
@@ -12,17 +12,21 @@
     {
       "action": "interact",
       "clickText": "Zone Mapper",
-      "screenshotPath": "beta21-text-click.png"
+      "screenshotPath": "beta21-text-click.png",
+      "waitFor": ".zone-mapper-container",
+      "timeout": 5000
     },
     {
       "action": "interact",
-      "selector": "button:nth-of-type(1)",
-      "screenshotPath": "beta21-css-selector.png"
+      "selector": "button[data-testid='user-profile-button']",
+      "screenshotPath": "beta21-css-selector.png",
+      "timeout": 5000
     },
     {
       "action": "interact",
       "clickRegion": "center",
-      "screenshotPath": "beta21-region-click.png"
+      "screenshotPath": "beta21-region-click.png",
+      "timeout": 5000
     }
   ],
   "options": {

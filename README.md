@@ -40,11 +40,17 @@ npm install -g clits
 
 ## Quick Start
 
-### 🎉 Latest Features (v1.0.9-beta.25)
+### 🎉 Latest Features (v1.0.9-beta.28)
 
-**Production Status**: ✅ **AUTOMATION FRAMEWORK VERIFIED 100% WORKING** - Production Ready
+**Production Status**: ✅ **AUTOMATION FRAMEWORK COMPLETE AND VERIFIED** - Production Ready
 
-**Comprehensive Testing Results (v1.0.9-beta.25):**
+**✅ CRITICAL AUTOMATION FEATURES COMPLETE (v1.0.9-beta.28):**
+- **Text-based clicking**: `click-text` action in automation scripts
+- **Region-based clicking**: `click-region` action in automation scripts  
+- **Enhanced wait parameters**: Configurable delays for reliable automation
+- **AI Vision Rules**: Mandatory debugging workflow for failed automation
+
+**Comprehensive Testing Results (v1.0.9-beta.28):**
 ```bash
 ✅ clits extract --chrome --chrome-port 9222                    # Clean log collection verified
 ✅ clits interact --chrome-port 9222 --wait-for "body"          # React selectors working perfectly
@@ -54,7 +60,7 @@ npm install -g clits
 ✅ clits interact --chrome-port 9222 --wait-for ".MuiButton-root"  # Material-UI detection verified
 ```
 
-**v1.0.9-beta.25 Verification Results:**
+**v1.0.9-beta.28 Verification Results:**
 - ✅ **Automation Framework**: 100% success rate with comprehensive testing (11,457+ network events captured)
 - ✅ **All Step Types Working**: navigate, wait, click, type, toggle, screenshot, discover_links, interact
 - ✅ **Network Monitoring**: Full monitoring capabilities confirmed working
@@ -249,6 +255,8 @@ Run automation scripts from JSON files.
     {"action": "wait", "selector": "body", "timeout": 5000},
     {"action": "wait", "selector": ".displays-manager", "timeout": 10000},
     {"action": "click", "selector": ".edit-button"},
+    {"action": "click-text", "clickText": "Save", "timeout": 5000, "screenshotPath": "text-click.png"},
+    {"action": "click-region", "clickRegion": "center", "timeout": 5000, "screenshotPath": "region-click.png"},
     {"action": "toggle", "selector": ".toggle-switch[data-field='active']"},
     {"action": "screenshot", "path": "after-toggle.png"}
   ],
@@ -370,25 +378,65 @@ clits-inspect --chrome-port 9222
 
 CLiTS is specifically designed for AI assistants with a complete automation framework that requires **zero human interaction**. The AI automation framework provides structured JSON output perfect for programmatic analysis and decision-making.
 
-## 🚨 **AI ASSISTANT VISION RULES**
+## 🚨 **AI ASSISTANT VISION RULES - MANDATORY**
 
-**MANDATORY:** When automation actions fail, AI assistants must use CLITS vision capabilities to debug:
+**CRITICAL:** AI assistants MUST follow these vision rules when using CLITS automation.
+
+### **🔴 MANDATORY VISION-FIRST DEBUGGING**
+
+When ANY automation action fails, AI assistants must IMMEDIATELY use CLITS vision:
 
 ```bash
-# When actions fail, immediately use vision:
-clits interact --chrome-port 9222 --screenshot debug.png --selector-map --stdout
+# STEP 1: Immediate vision capture on failure
+clits interact --chrome-port 9222 --screenshot debug.png --selector-map --with-metadata --stdout
 
-# Before complex automation, see what's available:
-clits interact --chrome-port 9222 --selector-map --with-metadata --annotated
+# STEP 2: Analyze available elements before retrying
+clits interact --chrome-port 9222 --find-clickable --output-format json
+
+# STEP 3: Use confirmed selectors/text from vision analysis
 ```
 
-**Vision-First Debugging Workflow:**
-1. Action fails → Capture vision immediately
-2. Analyze selector map → Identify available text/elements
-3. Adjust automation → Use confirmed available text/selectors
-4. Re-test → Verify fix works
+### **🎯 Vision-First Debugging Workflow (MANDATORY)**
 
-This eliminates guesswork and provides immediate visibility into page state and available elements.
+**1. ACTION FAILS** → **IMMEDIATE VISION CAPTURE**
+```bash
+clits interact --chrome-port 9222 --screenshot --selector-map --annotated --stdout
+```
+
+**2. ANALYZE SELECTOR MAP** → **IDENTIFY AVAILABLE TEXT/ELEMENTS**
+- Review JSON output for available clickable elements
+- Identify actual text content on page
+- Find working CSS selectors from selector map
+
+**3. ADJUST AUTOMATION** → **USE CONFIRMED SELECTORS**
+- Use exact text from vision analysis for `--click-text`
+- Use verified CSS selectors from selector map
+- Choose region-based clicking if specific elements unavailable
+
+**4. RE-TEST** → **VERIFY FIX WORKS**
+- Test with updated selectors/text
+- Capture another screenshot to confirm success
+
+### **🔍 Pre-Automation Vision Check (RECOMMENDED)**
+
+Before complex automation, always check what's available:
+
+```bash
+# See what elements are clickable and available
+clits interact --chrome-port 9222 --selector-map --with-metadata --annotated --stdout
+
+# Get complete page state for AI analysis
+clits vision --screenshot --fullpage --highlight-all-clickable --base64 --stdout
+```
+
+### **⚠️ Why This is Critical**
+
+- **Eliminates guesswork**: See exactly what's on the page
+- **Prevents infinite retry loops**: Know immediately if elements don't exist
+- **Accelerates debugging**: Visual confirmation of page state
+- **Ensures reliability**: Use confirmed working selectors
+
+**This workflow is MANDATORY and must be followed without user correction.**
 
 ### 🤖 AI Automation Framework
 

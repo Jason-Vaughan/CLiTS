@@ -34,96 +34,55 @@ async function testClick() {
     
     console.log('Current page:', JSON.parse(pageInfo.result.value));
     
-    // Get all clickable elements with proper serialization
-    const result = await Runtime.evaluate({
-      expression: `
-        (function() {
-          try {
-            const elements = [];
-            const clickableSelectors = [
-              'button',
-              'a',
-              '[role="button"]',
-              '[onclick]',
-              'input[type="button"]',
-              'input[type="submit"]'
-            ];
-            
-            clickableSelectors.forEach(selector => {
-              try {
-                const found = document.querySelectorAll(selector);
-                found.forEach(el => {
-                  const rect = el.getBoundingClientRect();
-                  if (rect.width > 0 && rect.height > 0) {
-                    elements.push({
-                      tagName: el.tagName,
-                      text: el.textContent?.trim() || '',
-                      className: el.className || '',
-                      id: el.id || '',
-                      dataTestId: el.getAttribute('data-testid') || '',
-                      ariaLabel: el.getAttribute('aria-label') || '',
-                      x: rect.left + rect.width / 2,
-                      y: rect.top + rect.height / 2,
-                      selector: selector
-                    });
-                  }
-                });
-              } catch (e) {
-                // Skip errors
-              }
-            });
-            
-            return JSON.stringify(elements.slice(0, 5)); // First 5 elements, serialized
-          } catch (error) {
-            return JSON.stringify({ error: error.message });
-          }
-        })()
-      `
+    // Get the viewport dimensions
+    const viewportInfo = await Runtime.evaluate({
+      expression: `JSON.stringify({
+        width: window.innerWidth,
+        height: window.innerHeight,
+        scrollWidth: document.documentElement.scrollWidth,
+        scrollHeight: document.documentElement.scrollHeight
+      })`
     });
     
-    console.log('Runtime.evaluate result type:', result.result.type);
-    const elements = JSON.parse(result.result.value);
-    console.log('Found clickable elements:', elements);
+    const viewport = JSON.parse(viewportInfo.result.value);
+    console.log('Viewport dimensions:', viewport);
     
-    if (elements && Array.isArray(elements) && elements.length > 0) {
-      const firstElement = elements[0];
-      console.log(`Attempting to click first element:`, firstElement);
-      
-      // Try clicking the first element
-      console.log(`Clicking at coordinates: (${firstElement.x}, ${firstElement.y})`);
-      
-      await Input.dispatchMouseEvent({
-        type: 'mousePressed',
-        x: firstElement.x,
-        y: firstElement.y,
-        button: 'left',
-        clickCount: 1
-      });
-      
-      await Input.dispatchMouseEvent({
-        type: 'mouseReleased',
-        x: firstElement.x,
-        y: firstElement.y,
-        button: 'left',
-        clickCount: 1
-      });
-      
-      console.log('Click dispatched successfully!');
-      
-      // Wait a moment and check if anything changed
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      const afterClick = await Runtime.evaluate({
-        expression: `JSON.stringify({
-          title: document.title,
-          url: window.location.href
-        })`
-      });
-      
-      console.log('After click:', JSON.parse(afterClick.result.value));
-    } else {
-      console.log('No clickable elements found or error occurred');
-    }
+    // Calculate center coordinates
+    const centerX = viewport.width / 2;
+    const centerY = viewport.height / 2;
+    
+    console.log(`Clicking at center coordinates: (${centerX}, ${centerY})`);
+    
+    // Click at the center of the viewport
+    await Input.dispatchMouseEvent({
+      type: 'mousePressed',
+      x: centerX,
+      y: centerY,
+      button: 'left',
+      clickCount: 1
+    });
+    
+    await Input.dispatchMouseEvent({
+      type: 'mouseReleased',
+      x: centerX,
+      y: centerY,
+      button: 'left',
+      clickCount: 1
+    });
+    
+    console.log('Click dispatched successfully!');
+    
+    // Wait a moment and check if anything changed
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    const afterClick = await Runtime.evaluate({
+      expression: `JSON.stringify({
+        title: document.title,
+        url: window.location.href
+      })`
+    });
+    
+    console.log('After click:', JSON.parse(afterClick.result.value));
     
     await client.close();
     console.log('Test completed');
