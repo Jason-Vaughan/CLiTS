@@ -576,7 +576,7 @@ clits-inspect --auto --json --action logs --duration 30 --target-priority localh
 
 The automation framework handles Chrome launching, tab selection, and provides structured JSON responses perfect for AI analysis. All commands are designed to work without any human intervention.
 
-#### **NEW: Text & Region-based Automation Actions (v1.0.9-beta.26)**
+#### **NEW: Text & Region-based Automation Actions (v1.0.9-beta.27)**
 
 **Critical Update:** Added missing `click-text` and `click-region` actions to automation framework:
 
