@@ -31,7 +31,11 @@ alwaysApply: false
     },
     "documentation": {
       "description": "README.md must include project goals, usage, BSD compliance, and AI assistant integration instructions. All dependencies and install steps must be documented. Add a LICENSE file (MIT or BSD recommended).",
-      "required": true
+      "required": true,
+      "readme_preservation": {
+        "description": "The logo link in README.md must be preserved and not overwritten during updates. The logo is a critical part of the project's branding and must remain consistent.",
+        "required": true
+      }
     },
     "publishing": {
       "description": "Prepare for open-source release (clean code, clear docs, BSD compliance). CLI tool should be installable via npm (future milestone). Browser extension should be publishable to the Chrome Web Store (future milestone).",

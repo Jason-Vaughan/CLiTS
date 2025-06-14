@@ -4,6 +4,26 @@
 
 # CLiTS (Chrome Log Inspector & Troubleshooting System)
 
+[![npm version](https://img.shields.io/npm/v/clits.svg)](https://www.npmjs.com/package/clits)
+[![License: BSD](https://img.shields.io/badge/License-BSD-blue.svg)](LICENSE)
+
+## 🎯 Cursor AI Integration
+
+CLITS is specifically designed for seamless integration with Cursor AI, providing a powerful automated debugging workflow:
+
+- **🤖 AI-First Design**: Built from the ground up for AI-assisted debugging
+- **🔍 Automated Analysis**: Automatic log collection and analysis for AI processing
+- **📊 Structured Output**: JSON-formatted data perfect for AI consumption
+- **🎯 Smart Filtering**: AI-optimized filtering and monitoring capabilities
+- **🔄 Real-time Feedback**: Instant feedback loops for AI debugging assistance
+
+### Example AI Workflow
+```typescript
+// CLITS automatically provides structured data for AI analysis
+const logs = await clits.captureDebugData();
+// AI can now analyze the logs and provide debugging insights
+```
+
 A powerful CLI tool for extracting and sharing debugging data (logs, network info, etc.) for AI and web projects. CLI-first, with future browser extension support.
 
 ## Features
@@ -658,4 +678,38 @@ The automation framework handles Chrome launching, tab selection, and provides s
 **Usage:**
 ```bash
 clits automate --script automation.json --chrome-port 9222 --save-results results.json
-``` 
+```
+
+## Development Integration
+
+CLITS now provides a powerful development integration framework that allows you to embed CLITS directly into your Chrome application development workflow. This integration provides:
+
+- Direct hooks into your application's runtime
+- Automatic monitoring of React, Redux, GraphQL, and more
+- Built-in error boundary integration
+- Performance monitoring
+- User interaction recording
+- DOM mutation tracking
+- CSS change monitoring
+- WebSocket monitoring
+- JWT token monitoring
+- And much more!
+
+### Quick Start
+
+```typescript
+import { initializeCLITS } from 'clits';
+
+// Initialize with default settings
+initializeCLITS();
+
+// Or with custom configuration
+initializeCLITS({
+  monitorReact: true,
+  monitorRedux: true,
+  monitorGraphQL: true,
+  // ... other options
+});
+```
+
+For detailed documentation on development integration, see [DEVELOPMENT_INTEGRATION.md](docs/DEVELOPMENT_INTEGRATION.md). 

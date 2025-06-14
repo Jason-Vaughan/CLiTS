@@ -756,6 +756,48 @@ All priority issues from OnDeck bug report addressed:
 
 **OnDeck Integration Status**: ✅ **CRITICAL ISSUES RESOLVED** - interact --click command now fully functional
 
+## [1.2.0-beta.1] - 2025-06-14
+
+### 🎉 **DEVELOPMENT INTEGRATION FRAMEWORK**
+
+#### Added
+- **🎯 Development Integration Framework**: New framework for direct application integration
+  - Direct hooks into application runtime
+  - Automatic monitoring of React, Redux, GraphQL
+  - Built-in error boundary integration
+  - Performance monitoring
+  - User interaction recording
+  - DOM mutation tracking
+  - CSS change monitoring
+  - WebSocket monitoring
+  - JWT token monitoring
+
+- **📚 New Documentation**:
+  - `DEVELOPMENT_INTEGRATION.md`: Comprehensive guide for development integration
+  - Updated README with integration examples
+  - Framework-specific integration guides
+
+- **🛠 New API**:
+  - `initializeCLITS()`: Easy initialization function
+  - `DevIntegration` class for advanced configuration
+  - Framework-specific integration helpers
+  - Customizable monitoring options
+  - Flexible output configuration
+
+#### Enhanced
+- **🎯 Framework Support**: Better integration with popular frameworks
+  - React hooks monitoring
+  - Redux state tracking
+  - GraphQL operation monitoring
+  - WebSocket connection tracking
+  - JWT token monitoring
+
+- **📊 Performance**: Improved monitoring efficiency
+  - Direct application hooks
+  - Reduced DOM scanning
+  - Better error tracking
+  - Enhanced state monitoring
+
 [1.0.0]: https://github.com/jasonvaughan/clits/releases/tag/v1.0.0
 [0.3.0]: https://github.com/jasonvaughan/clits/releases/tag/v0.3.0
 [0.2.0]: https://github.com/jasonvaughan/clits/releases/tag/v0.2.0

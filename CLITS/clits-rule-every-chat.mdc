@@ -3,3 +3,9 @@ description:
 globs:
 alwaysApply: false
 ---
+"publishing": {
+  "release_workflow": {
+    "description": "For every release (beta or stable), always use `npm version <new-version>` to bump the version, then publish to NPM, and finally push both commits and tags to git. This ensures git and NPM versions are always in sync.",
+    "required": true
+  }
+}
